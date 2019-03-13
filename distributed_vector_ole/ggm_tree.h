@@ -22,11 +22,13 @@ class GGMTree {
   // Constructs a GGM tree from a single seed.
   GGMTree(int arity, int64_t num_leaves, absl::Span<const uint8_t> seed);
 
+  // The size of each seed.
+  static const int kBlockSize = AES_BLOCK_SIZE;
+
  private:
   // Expands the subtree rooted at the node given by level and node index.
   void ExpandSubtree(int start_level, int64_t start_node);
 
-  static const int kBlockSize = AES_BLOCK_SIZE;
   int arity_;
   int64_t num_leaves_;
   int num_levels_;
