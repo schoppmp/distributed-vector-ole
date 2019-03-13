@@ -1,0 +1,14 @@
+variables:
+  REGISTRY: gitlab.informatik.hu-berlin.de:4567
+
+build_all:
+  image: $REGISTRY/ti/software/bazel-builder:latest
+  stage: build
+  script:
+    - bazel build ...
+    - bazel test ...
+    - mkdir logs && cp -rL bazel-testlogs/* logs  # Artifacts have to be in the workspace, but bazel-testlogs is a symlink that points outside of it.
+  artifacts:
+    when: always
+    paths:
+      - logs
