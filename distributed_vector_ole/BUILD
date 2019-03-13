@@ -7,7 +7,7 @@ cc_library(
         "ggm_tree.h",
     ],
     deps = [
-        "@abseil//absl/strings",
+        "@abseil//absl/types:span",
         "@boringssl//:crypto",
     ],
 )
@@ -19,6 +19,8 @@ cc_test(
     ],
     deps = [
         ":ggm_tree",
+        "@boost//:asio",
+        "@boost//:thread",
         "@mpc_utils//mpc_utils/testing:test_deps",
     ],
 )
