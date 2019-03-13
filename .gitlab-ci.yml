@@ -6,7 +6,7 @@ build_all:
   stage: build
   script:
     - bazel build ...
-    - bazel test ...
+    - bazel test //distributed_vector_ole/... # Don't test EMP on the CI, because we don't have AES-NI there.
     - mkdir logs && cp -rL bazel-testlogs/* logs  # Artifacts have to be in the workspace, but bazel-testlogs is a symlink that points outside of it.
   artifacts:
     when: always
