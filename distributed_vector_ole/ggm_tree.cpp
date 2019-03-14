@@ -1,27 +1,14 @@
 #include "ggm_tree.h"
+#include <omp.h>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <functional>
 #include "absl/memory/memory.h"
-#include "boost/asio.hpp"
-#include "boost/thread.hpp"
 #include "openssl/err.h"
 #include "openssl/rand.h"
 
 namespace distributed_vector_ole {
-
-namespace {
-
-void EncryptBlockWise(absl::Span<const uint8_t> in, int64_t num_blocks,
-                      const AES_KEY* key, absl::Span<uint8_t> out) {
-  for (int64_t i = 0; i < num_blocks; i++) {
-    int64_t block_start = i * GGMTree::kBlockSize;
-    AES_encrypt(&in[block_start], &out[block_start], key);
-  }
-}
-
-}  // namespace
 
 mpc_utils::StatusOr<std::unique_ptr<GGMTree>> GGMTree::Create(
     int arity, int64_t num_leaves, absl::Span<const uint8_t> seed) {
@@ -80,94 +67,29 @@ GGMTree::GGMTree(std::vector<std::vector<uint8_t>> levels,
       expanded_keys_(std::move(expanded_keys)) {}
 
 void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
-  // The byte we start at in each level.
-  int64_t start_index = start_node * kBlockSize;
-  int64_t nodes_at_current_level = 1;
-  int num_threads = boost::thread::hardware_concurrency() * 2;
-
-  // We process levels sequentially, but parallelize each level.
-  for (int level_index = start_level;
-       level_index < num_levels_ - 1 &&
-       start_index < static_cast<int64_t>(levels_[level_index].size());
+  // Iterate over levels, then nodes, then keys.
+  int64_t max_node_index = 1;
+  for (int level_index = start_level; level_index < num_levels_ - 1;
        level_index++) {
-    boost::asio::thread_pool pool(num_threads);
+    // Account for the fact that the level might not be full.
+    max_node_index = std::min(
+        max_node_index,
+        static_cast<int64_t>(levels_[level_index].size()) / kBlockSize);
 
-    // Compute size of the next level of this subtree, accounting for the fact
-    // that the tree might not be full.
-    int64_t nodes_at_next_level = arity_ * nodes_at_current_level;
-    if (arity_ * start_index + nodes_at_next_level * kBlockSize >
-        static_cast<int64_t>(levels_[level_index + 1].size())) {
-      nodes_at_next_level =
-          (levels_[level_index + 1].size() - arity_ * start_index) / kBlockSize;
-    }
-
-    // Adjust number of tasks per key if the arity is not enough to fully
-    // parallelize.
-    int tasks_per_key = 1;
-    if (arity_ < num_threads) {
-      tasks_per_key = (num_threads + arity_ - 1) / arity_;
-    }
-
-    // Iterate over keys, encrypting the seeds at the current level with each
-    // key.
-    std::vector<std::vector<uint8_t>> task_results(arity_ * tasks_per_key);
-    for (int key_index = 0; key_index < arity_; key_index++) {
-      // With each key, we only need to compute every arity_-th seed.
-      int64_t num_blocks_for_key = nodes_at_next_level / arity_;
-      if (key_index < nodes_at_next_level % arity_) {
-        num_blocks_for_key++;
-      }
-
-      // Split work between tasks.
-      int64_t task_start_index = start_index;
-      for (int task = 0; task < tasks_per_key; task++) {
-        int task_index = key_index * tasks_per_key + task;
-        int64_t num_blocks_for_task = num_blocks_for_key / tasks_per_key;
-        if (task < num_blocks_for_key % tasks_per_key) {
-          num_blocks_for_task++;
-        }
-
-        int64_t task_size = num_blocks_for_task * kBlockSize;
-        assert(task_start_index + task_size <=
-               static_cast<int64_t>(levels_[level_index].size()));
-        task_results[task_index].resize(task_size);
-
-        // Use Spans to pass current seeds and write results.
-        absl::Span<uint8_t> encryption_results =
-            absl::MakeSpan(task_results[task_index]);
-        absl::Span<const uint8_t> encryption_inputs = absl::MakeConstSpan(
-            &levels_[level_index][task_start_index], task_size);
-
-        // Spawn task!
-        boost::asio::post(
-            pool,
-            std::bind(EncryptBlockWise, encryption_inputs, num_blocks_for_task,
-                      &expanded_keys_[key_index], encryption_results));
-        task_start_index += task_size;
+#pragma omp parallel num_threads(omp_get_num_procs())
+#pragma omp for schedule(guided)
+    for (int64_t node_index = 0; node_index < max_node_index; node_index++) {
+      for (int key_index = 0; key_index < arity() &&
+                              (arity_ * node_index + key_index) * kBlockSize <
+                                  levels_[level_index + 1].size();
+           key_index++) {
+        AES_encrypt(&levels_[level_index][node_index * kBlockSize],
+                    &levels_[level_index + 1]
+                            [(arity_ * node_index + key_index) * kBlockSize],
+                    &expanded_keys_[key_index]);
       }
     }
-    pool.join();
-
-    // Write results to the next level of the tree.
-    for (int key_index = 0; key_index < arity_; key_index++) {
-      int64_t task_start_index = start_index;
-      for (int task = 0; task < tasks_per_key; task++) {
-        int task_index = key_index * tasks_per_key + task;
-        int64_t task_size =
-            static_cast<int64_t>(task_results[task_index].size());
-        for (int64_t node_index = 0; kBlockSize * node_index < task_size;
-             node_index++) {
-          std::copy_n(
-              &task_results[task_index][kBlockSize * node_index], kBlockSize,
-              &levels_[level_index + 1]
-                      [(task_start_index + node_index * kBlockSize) * arity_ +
-                       key_index * kBlockSize]);
-        }
-        task_start_index += task_size;
-      }
-    }
-    nodes_at_current_level = nodes_at_next_level;
-    start_index *= arity_;
+    max_node_index *= arity_;
   }
 }
 

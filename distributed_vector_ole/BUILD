@@ -6,11 +6,15 @@ cc_library(
     hdrs = [
         "ggm_tree.h",
     ],
+    copts = [
+        "-fopenmp",
+    ],
+    linkopts = [
+        "-lgomp",
+    ],
     deps = [
         "@abseil//absl/memory",
         "@abseil//absl/types:span",
-        "@boost//:asio",
-        "@boost//:thread",
         "@boringssl//:crypto",
         "@mpc_utils//mpc_utils:statusor",
     ],
