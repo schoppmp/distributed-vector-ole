@@ -150,4 +150,17 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
   }
 }
 
+mpc_utils::StatusOr<absl::Span<const uint8_t>> GGMTree::GetValueAtNode(
+    int level_index, int64_t node_index) const {
+  if (level_index < 0 || level_index >= num_levels_) {
+    return mpc_utils::InvalidArgumentError("level_index out of range");
+  }
+  if (node_index < 0 || node_index * kBlockSize >=
+                            static_cast<int64_t>(levels_[level_index].size())) {
+    return mpc_utils::InvalidArgumentError("node_index out of range");
+  }
+  return absl::MakeConstSpan(&levels_[level_index][node_index * kBlockSize],
+                             kBlockSize);
+}
+
 }  // namespace distributed_vector_ole

@@ -20,12 +20,22 @@ namespace distributed_vector_ole {
 
 class GGMTree {
  public:
+  // The size of each seed.
+  static const int kBlockSize = AES_BLOCK_SIZE;
+
   // Constructs a GGM tree from a single seed.
   static mpc_utils::StatusOr<std::unique_ptr<GGMTree>> Create(
       int arity, int64_t num_leaves, absl::Span<const uint8_t> seed);
 
-  // The size of each seed.
-  static const int kBlockSize = AES_BLOCK_SIZE;
+  // Returns the value at the `node_index`-th node at the given level.
+  mpc_utils::StatusOr<absl::Span<const uint8_t>> GetValueAtNode(
+      int level_index, int64_t node_index) const;
+
+  // Returns the value at `leaf_index`-th leaf.
+  inline mpc_utils::StatusOr<absl::Span<const uint8_t>> GetValueAtLeaf(
+      int64_t leaf_index) {
+    return GetValueAtNode(num_levels_, leaf_index);
+  }
 
  private:
   GGMTree(std::vector<std::vector<uint8_t>> levels,
