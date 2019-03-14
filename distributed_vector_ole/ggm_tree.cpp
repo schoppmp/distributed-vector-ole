@@ -13,9 +13,9 @@ namespace distributed_vector_ole {
 
 namespace {
 
-void EncryptBlockWise(absl::Span<const uint8_t> in, int num_blocks,
+void EncryptBlockWise(absl::Span<const uint8_t> in, int64_t num_blocks,
                       const AES_KEY* key, absl::Span<uint8_t> out) {
-  for (int i = 0; i < num_blocks; i++) {
+  for (int64_t i = 0; i < num_blocks; i++) {
     int64_t block_start = i * GGMTree::kBlockSize;
     AES_encrypt(&in[block_start], &out[block_start], key);
   }
@@ -73,7 +73,7 @@ GGMTree::GGMTree(std::vector<std::vector<uint8_t>> levels,
                  std::vector<std::vector<uint8_t>> keys,
                  std::vector<AES_KEY> expanded_keys)
     : arity_(keys.size()),
-      num_leaves_(levels.back().size()),
+      num_leaves_(levels.back().size() / kBlockSize),
       num_levels_(levels.size()),
       levels_(std::move(levels)),
       keys_(std::move(keys)),
@@ -81,8 +81,8 @@ GGMTree::GGMTree(std::vector<std::vector<uint8_t>> levels,
 
 void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
   // The byte we start at in each level.
-  int start_index = start_node * kBlockSize;
-  int level_size = 1;
+  int64_t start_index = start_node * kBlockSize;
+  int64_t nodes_at_current_level = 1;
   int num_threads = boost::thread::hardware_concurrency() * 2;
 
   // We process levels sequentially, but parallelize each level.
@@ -91,14 +91,17 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
        start_index < static_cast<int64_t>(levels_[level_index].size());
        level_index++) {
     boost::asio::thread_pool pool(num_threads);
+    std::cout << "nodes at current level: " << nodes_at_current_level << "\n";
 
     // Compute size of the next level of this subtree, accounting for the fact
     // that the tree might not be full.
-    int64_t next_level_size = arity_ * level_size;
-    if (arity_ * start_index + next_level_size >
+    int64_t nodes_at_next_level = arity_ * nodes_at_current_level;
+    if (arity_ * start_index + nodes_at_next_level * kBlockSize >
         static_cast<int64_t>(levels_[level_index + 1].size())) {
-      next_level_size = levels_[level_index + 1].size() - arity_ * start_index;
+      nodes_at_next_level =
+          (levels_[level_index + 1].size() - arity_ * start_index) / kBlockSize;
     }
+    std::cout << "nodes at next level: " << nodes_at_next_level << "\n";
 
     // Adjust number of tasks per key if the arity is not enough to fully
     // parallelize.
@@ -112,10 +115,11 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
     std::vector<std::vector<uint8_t>> task_results(arity_ * tasks_per_key);
     for (int key_index = 0; key_index < arity_; key_index++) {
       // With each key, we only need to compute every arity_-th seed.
-      int64_t num_blocks_for_key = next_level_size / kBlockSize / arity_;
-      if (key_index < (next_level_size / kBlockSize) % arity_) {
+      int64_t num_blocks_for_key = nodes_at_next_level / arity_;
+      if (key_index < nodes_at_next_level % arity_) {
         num_blocks_for_key++;
       }
+      std::cout << "blocks for key: " << num_blocks_for_key << "\n";
 
       // Split work between tasks.
       int64_t task_start_index = start_index;
@@ -125,10 +129,13 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
         if (task < num_blocks_for_key % tasks_per_key) {
           num_blocks_for_task++;
         }
+        std::cout << "blocks for task: " << num_blocks_for_task << "\n";
+
         int64_t task_size = num_blocks_for_task * kBlockSize;
         assert(task_start_index + task_size <=
                static_cast<int64_t>(levels_[level_index].size()));
         task_results[task_index].resize(task_size);
+        std::cout << "task size: " << task_size << "\n";
 
         // Use Spans to pass current seeds and write results.
         absl::Span<uint8_t> encryption_results =
@@ -145,7 +152,26 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
       }
     }
     pool.join();
-    level_size = next_level_size;
+
+    // Write results to the next level of the tree.
+    for (int key_index = 0; key_index < arity_; key_index++) {
+      int64_t task_start_index = start_index;
+      for (int task = 0; task < tasks_per_key; task++) {
+        int task_index = key_index * tasks_per_key + task;
+        int64_t task_size =
+            static_cast<int64_t>(task_results[task_index].size());
+        for (int64_t node_index = 0; kBlockSize * node_index < task_size;
+             node_index++) {
+          std::copy_n(
+              &task_results[task_index][kBlockSize * node_index], kBlockSize,
+              &levels_[level_index + 1]
+                      [(task_start_index + node_index * kBlockSize) * arity_ +
+                       key_index * kBlockSize]);
+        }
+        task_start_index += task_size;
+      }
+    }
+    nodes_at_current_level = nodes_at_next_level;
     start_index *= arity_;
   }
 }

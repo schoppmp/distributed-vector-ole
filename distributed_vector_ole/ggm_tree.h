@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <iomanip>
 #include "absl/types/span.h"
 #include "mpc_utils/statusor.h"
 #include "openssl/aes.h"
@@ -33,8 +34,37 @@ class GGMTree {
 
   // Returns the value at `leaf_index`-th leaf.
   inline mpc_utils::StatusOr<absl::Span<const uint8_t>> GetValueAtLeaf(
-      int64_t leaf_index) {
-    return GetValueAtNode(num_levels_, leaf_index);
+      int64_t leaf_index) const {
+    return GetValueAtNode(num_levels_ - 1, leaf_index);
+  }
+
+  // Returns the number of children of the tree's inner nodes.
+  inline int arity() { return arity_; }
+
+  // Returns the number of leaves.
+  inline int64_t num_leaves() { return num_leaves_; }
+
+  // Returns the height.
+  inline int num_levels() { return num_levels_; }
+
+  // Returns the keys used to expand levels. keys().size() equals arity().
+  inline absl::Span<const std::vector<uint8_t>> keys() { return keys_; }
+
+  // Returns the expanded versions of keys().
+  inline absl::Span<const AES_KEY> expanded_keys() { return expanded_keys_; }
+
+  void PrintTree() {
+    Print(levels_);
+  }
+
+  void Print(absl::Span<const std::vector<uint8_t>> input) {
+    for (int i = 0; i < input.size(); i++) {
+      std::cout << std::dec << input[i].size() << " ";
+      for (int j = 0; j < input[i].size(); j++) {
+        std::cout << std::hex << std::setw(2) <<  std::setfill('0') << int(input[i][j]);
+      }
+      std::cout << "\n";
+    }
   }
 
  private:
@@ -45,16 +75,16 @@ class GGMTree {
   // Expands the subtree rooted at the node given by level and node index.
   void ExpandSubtree(int start_level, int64_t start_node);
 
-  int arity_;
-  int64_t num_leaves_;
-  int num_levels_;
+  const int arity_;
+  const int64_t num_leaves_;
+  const int num_levels_;
 
   // Expanded seeds on each level.
   std::vector<std::vector<uint8_t>> levels_;
 
   // Number of keys is equal to `arity_`.
-  std::vector<std::vector<uint8_t>> keys_;
-  std::vector<AES_KEY> expanded_keys_;
+  const std::vector<std::vector<uint8_t>> keys_;
+  const std::vector<AES_KEY> expanded_keys_;
 };
 
 }  // namespace distributed_vector_ole
