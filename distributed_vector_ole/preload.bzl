@@ -34,7 +34,7 @@ def distributed_vector_ole_preload():
     if "mpc_utils" not in native.existing_rules():
         http_archive(
             name = "mpc_utils",
-            url = "https://github.com/schoppmp/mpc-utils/archive/cfcd49e5ec6d1158a95f930ae2c9d667129fd268.zip",
-            sha256 = "97c677cd19780797bab821d2cb450208d5e76b0caa3bf435ea24d62a726e0d36",
-            strip_prefix = "mpc-utils-cfcd49e5ec6d1158a95f930ae2c9d667129fd268",
+            url = "https://github.com/schoppmp/mpc-utils/archive/89eab6940c613fb136b36c29b848da8ed7fad3da.zip",
+            sha256 = "c7be3b113e425b7ab7d2cf41c8f70e87694d7585b2c63a251d85a0e9978f665d",
+            strip_prefix = "mpc-utils-89eab6940c613fb136b36c29b848da8ed7fad3da",
         )

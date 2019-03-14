@@ -7,8 +7,10 @@ cc_library(
         "ggm_tree.h",
     ],
     deps = [
+        "@abseil//absl/memory",
         "@abseil//absl/types:span",
         "@boringssl//:crypto",
+        "@mpc_utils//mpc_utils:statusor",
     ],
 )
 

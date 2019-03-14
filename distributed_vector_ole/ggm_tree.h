@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <vector>
 #include "absl/types/span.h"
+#include "mpc_utils/statusor.h"
 #include "openssl/aes.h"
 
 namespace distributed_vector_ole {
@@ -20,12 +21,17 @@ namespace distributed_vector_ole {
 class GGMTree {
  public:
   // Constructs a GGM tree from a single seed.
-  GGMTree(int arity, int64_t num_leaves, absl::Span<const uint8_t> seed);
+  static mpc_utils::StatusOr<std::unique_ptr<GGMTree>> Create(
+      int arity, int64_t num_leaves, absl::Span<const uint8_t> seed);
 
   // The size of each seed.
   static const int kBlockSize = AES_BLOCK_SIZE;
 
  private:
+  GGMTree(std::vector<std::vector<uint8_t>> levels,
+          std::vector<std::vector<uint8_t>> keys,
+          std::vector<AES_KEY> expanded_keys);
+
   // Expands the subtree rooted at the node given by level and node index.
   void ExpandSubtree(int start_level, int64_t start_node);
 
