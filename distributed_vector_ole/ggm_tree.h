@@ -12,7 +12,6 @@
 
 #include <cstdint>
 #include <vector>
-#include <iomanip>
 #include "absl/types/span.h"
 #include "mpc_utils/statusor.h"
 #include "openssl/aes.h"
@@ -52,20 +51,6 @@ class GGMTree {
 
   // Returns the expanded versions of keys().
   inline absl::Span<const AES_KEY> expanded_keys() { return expanded_keys_; }
-
-  void PrintTree() {
-    Print(levels_);
-  }
-
-  void Print(absl::Span<const std::vector<uint8_t>> input) {
-    for (int i = 0; i < input.size(); i++) {
-      std::cout << std::dec << input[i].size() << " ";
-      for (int j = 0; j < input[i].size(); j++) {
-        std::cout << std::hex << std::setw(2) <<  std::setfill('0') << int(input[i][j]);
-      }
-      std::cout << "\n";
-    }
-  }
 
  private:
   GGMTree(std::vector<std::vector<uint8_t>> levels,

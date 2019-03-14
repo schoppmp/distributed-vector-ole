@@ -16,6 +16,7 @@ class GGMTreeTest : public ::testing::Test {
   }
 
   std::vector<std::vector<uint8_t>> ExpandNaively() {
+    // Allocate levels and copy seed.
     std::vector<std::vector<uint8_t>> levels(tree_->num_levels());
     int64_t level_size = GGMTree::kBlockSize;
     for (int i = 0; i < tree_->num_levels(); i++) {
@@ -26,6 +27,8 @@ class GGMTreeTest : public ::testing::Test {
     EXPECT_OK(value);
     std::copy_n(value.ValueOrDie().begin(), GGMTree::kBlockSize,
                 levels[0].begin());
+
+    // Iterate over levels, then nodes, then keys.
     for (int level_index = 0; level_index < tree_->num_levels() - 1;
          level_index++) {
       for (int64_t node_index = 0;
@@ -47,18 +50,11 @@ class GGMTreeTest : public ::testing::Test {
   void CheckCorrectness() {
     auto levels_check = ExpandNaively();
     ASSERT_EQ(levels_check.size(), tree_->num_levels());
-    std::cout << "Tree:\n";
-    tree_->PrintTree();
-    std::cout << "Check:\n";
-    tree_->Print(levels_check);
     // Check for correctness at the leaves.
     for (int64_t i = 0; i < tree_->num_leaves(); i++) {
       auto leaf_check = absl::MakeConstSpan(
           &levels_check.back()[i * GGMTree::kBlockSize], GGMTree::kBlockSize);
       auto leaf = tree_->GetValueAtLeaf(i);
-      if (!leaf.ok()) {
-        std::cerr << "i = " << i << ", num_leaves" << tree_->num_leaves() << ", message: " << leaf.status().message() << "\n";
-      }
       ASSERT_TRUE(leaf.ok());
       for (int j = 0; j < GGMTree::kBlockSize; j++) {
         EXPECT_EQ(leaf_check[j], leaf.ValueOrDie()[j]);
@@ -75,10 +71,28 @@ TEST_F(GGMTreeTest, Constructor) {
   EXPECT_OK(tree);
 }
 
- TEST_F(GGMTreeTest, ExpansionSmall) {
-  // Test various values for arity and num_leaves.
-  for (int arity = 2; arity < 13; arity++) {
+TEST_F(GGMTreeTest, ExpansionSmall) {
+  for (int arity = 2; arity < 10; arity++) {
     for (int64_t num_leaves = 1; num_leaves < 100; num_leaves++) {
+      SetUp(arity, num_leaves);
+      CheckCorrectness();
+    }
+  }
+}
+
+TEST_F(GGMTreeTest, ExpansionLargeOdd) {
+  for (int arity = 7; arity < 100; arity += 13) {
+    for (int64_t num_leaves = 123; num_leaves < 1 << 20;
+         num_leaves = num_leaves * 31 + 17) {
+      SetUp(arity, num_leaves);
+      CheckCorrectness();
+    }
+  }
+}
+
+TEST_F(GGMTreeTest, ExpansionLargeEven) {
+  for (int arity = 2; arity < 1024; arity *= 2) {
+    for (int64_t num_leaves = 1; num_leaves < 1 << 20; num_leaves *= 1 << 5) {
       SetUp(arity, num_leaves);
       CheckCorrectness();
     }
@@ -93,10 +107,10 @@ TEST_F(GGMTreeTest, ConstructorArityMustBeAtLeastTwo) {
 }
 
 TEST_F(GGMTreeTest, ConstructorNumberOfLeavesMustNotBeNegative) {
-  auto tree = GGMTree::Create(2, -1, seed_);
+  auto tree = GGMTree::Create(2, 0, seed_);
   ASSERT_FALSE(tree.ok());
   EXPECT_EQ(tree.status().code(), mpc_utils::error::INVALID_ARGUMENT);
-  EXPECT_EQ(tree.status().message(), "num_leaves must not be negative");
+  EXPECT_EQ(tree.status().message(), "num_leaves must be positive");
 }
 
 TEST_F(GGMTreeTest, ConstructorSeedSizeMustMatchBlockSize) {

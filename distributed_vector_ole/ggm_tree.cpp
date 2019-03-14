@@ -28,8 +28,8 @@ mpc_utils::StatusOr<std::unique_ptr<GGMTree>> GGMTree::Create(
   if (arity < 2) {
     return mpc_utils::InvalidArgumentError("arity must be at least 2");
   }
-  if (num_leaves < 0) {
-    return mpc_utils::InvalidArgumentError("num_leaves must not be negative");
+  if (num_leaves <= 0) {
+    return mpc_utils::InvalidArgumentError("num_leaves must be positive");
   }
   if (seed.size() != kBlockSize) {
     return mpc_utils::InvalidArgumentError("seed must have length kBlockSize");
@@ -91,7 +91,6 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
        start_index < static_cast<int64_t>(levels_[level_index].size());
        level_index++) {
     boost::asio::thread_pool pool(num_threads);
-    std::cout << "nodes at current level: " << nodes_at_current_level << "\n";
 
     // Compute size of the next level of this subtree, accounting for the fact
     // that the tree might not be full.
@@ -101,7 +100,6 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
       nodes_at_next_level =
           (levels_[level_index + 1].size() - arity_ * start_index) / kBlockSize;
     }
-    std::cout << "nodes at next level: " << nodes_at_next_level << "\n";
 
     // Adjust number of tasks per key if the arity is not enough to fully
     // parallelize.
@@ -119,7 +117,6 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
       if (key_index < nodes_at_next_level % arity_) {
         num_blocks_for_key++;
       }
-      std::cout << "blocks for key: " << num_blocks_for_key << "\n";
 
       // Split work between tasks.
       int64_t task_start_index = start_index;
@@ -129,13 +126,11 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
         if (task < num_blocks_for_key % tasks_per_key) {
           num_blocks_for_task++;
         }
-        std::cout << "blocks for task: " << num_blocks_for_task << "\n";
 
         int64_t task_size = num_blocks_for_task * kBlockSize;
         assert(task_start_index + task_size <=
                static_cast<int64_t>(levels_[level_index].size()));
         task_results[task_index].resize(task_size);
-        std::cout << "task size: " << task_size << "\n";
 
         // Use Spans to pass current seeds and write results.
         absl::Span<uint8_t> encryption_results =
