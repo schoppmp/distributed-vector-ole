@@ -1,5 +1,6 @@
 #include "ggm_tree.h"
 #include <cmath>
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "mpc_utils/status_macros.h"
 
@@ -8,7 +9,7 @@ namespace {
 
 class GGMTreeTest : public ::testing::Test {
  protected:
-  GGMTreeTest() : seed_(AES_BLOCK_SIZE, 42) {}
+  GGMTreeTest() : seed_(GGMTree::kBlockSize, 42) {}
   void SetUp(int arity, int64_t num_leaves) {
     auto tree = GGMTree::Create(arity, num_leaves, seed_);
     ASSERT_TRUE(tree.ok());
@@ -106,7 +107,7 @@ TEST_F(GGMTreeTest, ConstructorArityMustBeAtLeastTwo) {
   EXPECT_EQ(tree.status().message(), "arity must be at least 2");
 }
 
-TEST_F(GGMTreeTest, ConstructorNumberOfLeavesMustNotBeNegative) {
+TEST_F(GGMTreeTest, ConstructorNumberOfLeavesMustBePositive) {
   auto tree = GGMTree::Create(2, 0, seed_);
   ASSERT_FALSE(tree.ok());
   EXPECT_EQ(tree.status().code(), mpc_utils::error::INVALID_ARGUMENT);
@@ -136,6 +137,20 @@ TEST_F(GGMTreeTest, GetValueInvalidNodeIndex) {
   EXPECT_EQ(value.status().code(), mpc_utils::error::INVALID_ARGUMENT);
   EXPECT_EQ(value.status().message(), "node_index out of range");
 }
+
+static void BM_Expand(benchmark::State& state) {
+  std::vector<uint8_t> seed(GGMTree::kBlockSize, 42);
+  int arity = state.range(0);
+  int64_t num_leaves = state.range(1);
+  for (auto _ : state) {
+    auto tree = GGMTree::Create(arity, num_leaves, seed);
+    EXPECT_OK(tree);
+  }
+}
+BENCHMARK(BM_Expand)->Ranges({
+    {2, 1024},          // arity
+    {1 << 12, 1 << 21}  // num_leaves
+});
 
 }  // namespace
 }  // namespace distributed_vector_ole

@@ -23,6 +23,7 @@ cc_test(
         ":ggm_tree",
         "@boost//:asio",
         "@boost//:thread",
+        "@com_github_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:test_deps",
     ],
 )

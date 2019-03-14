@@ -58,3 +58,11 @@ def distributed_vector_ole_deps():
             strip_prefix = "emp-ot-592c385e94f44fc942382b7c3d4b9f91ed84f33f",
             build_file = clean_dep("//third_party/emp:emp_ot.BUILD"),
         )
+
+    if "com_github_google_benchmark" not in native.existing_rules():
+        http_archive(
+            name = "com_github_google_benchmark",
+            url = "https://github.com/google/benchmark/archive/df7c7ee1d37dda0fb597586b4624515166a778d0.zip",
+            sha256 = "7f41a125c859da0115f144fb228e9b0a9ba404aeca76e5ca51e0bfe250cc0bb5",
+            strip_prefix = "benchmark-df7c7ee1d37dda0fb597586b4624515166a778d0",
+        )
