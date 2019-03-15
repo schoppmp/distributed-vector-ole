@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <vector>
+#include "absl/numeric/int128.h"
 #include "absl/types/span.h"
 #include "mpc_utils/statusor.h"
 #include "openssl/aes.h"
@@ -22,18 +23,19 @@ class GGMTree {
  public:
   // The size of each seed.
   static const int kBlockSize = AES_BLOCK_SIZE;
+  using Block = absl::uint128;
+  static_assert(sizeof(Block) == kBlockSize, "AES block size is not 128");
 
   // Constructs a GGM tree from a single seed.
   static mpc_utils::StatusOr<std::unique_ptr<GGMTree>> Create(
-      int arity, int64_t num_leaves, absl::Span<const uint8_t> seed);
+      int arity, int64_t num_leaves, Block seed);
 
   // Returns the value at the `node_index`-th node at the given level.
-  mpc_utils::StatusOr<absl::Span<const uint8_t>> GetValueAtNode(
-      int level_index, int64_t node_index) const;
+  mpc_utils::StatusOr<Block> GetValueAtNode(int level_index,
+                                            int64_t node_index) const;
 
   // Returns the value at `leaf_index`-th leaf.
-  inline mpc_utils::StatusOr<absl::Span<const uint8_t>> GetValueAtLeaf(
-      int64_t leaf_index) const {
+  inline mpc_utils::StatusOr<Block> GetValueAtLeaf(int64_t leaf_index) const {
     return GetValueAtNode(num_levels_ - 1, leaf_index);
   }
 
@@ -47,14 +49,13 @@ class GGMTree {
   inline int num_levels() { return num_levels_; }
 
   // Returns the keys used to expand levels. keys().size() equals arity().
-  inline absl::Span<const std::vector<uint8_t>> keys() { return keys_; }
+  inline absl::Span<const Block> keys() { return keys_; }
 
   // Returns the expanded versions of keys().
   inline absl::Span<const AES_KEY> expanded_keys() { return expanded_keys_; }
 
  private:
-  GGMTree(std::vector<std::vector<uint8_t>> levels,
-          std::vector<std::vector<uint8_t>> keys,
+  GGMTree(std::vector<std::vector<Block>> levels, std::vector<Block> keys,
           std::vector<AES_KEY> expanded_keys);
 
   // Expands the subtree rooted at the node given by level and node index.
@@ -65,10 +66,10 @@ class GGMTree {
   const int num_levels_;
 
   // Expanded seeds on each level.
-  std::vector<std::vector<uint8_t>> levels_;
+  std::vector<std::vector<Block>> levels_;
 
   // Number of keys is equal to `arity_`.
-  const std::vector<std::vector<uint8_t>> keys_;
+  const std::vector<Block> keys_;
   const std::vector<AES_KEY> expanded_keys_;
 };
 
