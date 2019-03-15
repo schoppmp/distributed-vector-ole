@@ -14,6 +14,7 @@ cc_library(
     ],
     deps = [
         "@abseil//absl/memory",
+        "@abseil//absl/numeric:int128",
         "@abseil//absl/types:span",
         "@boringssl//:crypto",
         "@mpc_utils//mpc_utils:statusor",

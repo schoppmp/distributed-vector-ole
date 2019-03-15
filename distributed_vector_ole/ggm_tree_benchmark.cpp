@@ -6,7 +6,7 @@ namespace distributed_vector_ole {
 namespace {
 
 static void BM_Expand(benchmark::State& state) {
-  std::vector<uint8_t> seed(GGMTree::kBlockSize, 42);
+  GGMTree::Block seed(42);
   int arity = state.range(0);
   int64_t num_leaves = state.range(1);
   for (auto _ : state) {
