@@ -29,12 +29,10 @@ class GGMTreeTest : public ::testing::Test {
                 levels[0].begin());
 
     // Iterate over levels, then nodes, then keys.
+    int64_t max_node_index = 1;
     for (int level_index = 0; level_index < tree_->num_levels() - 1;
          level_index++) {
-      for (int64_t node_index = 0;
-           node_index * GGMTree::kBlockSize <
-           static_cast<int64_t>(levels[level_index].size());
-           node_index++) {
+      for (int64_t node_index = 0; node_index < max_node_index; node_index++) {
         for (int key_index = 0; key_index < tree_->arity(); key_index++) {
           AES_encrypt(&levels[level_index][node_index * GGMTree::kBlockSize],
                       &levels[level_index + 1]
@@ -43,6 +41,7 @@ class GGMTreeTest : public ::testing::Test {
                       &tree_->expanded_keys()[key_index]);
         }
       }
+      max_node_index *= tree_->arity();
     }
     return levels;
   }
