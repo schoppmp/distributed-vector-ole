@@ -29,6 +29,7 @@ cc_test(
     ],
     deps = [
         ":ggm_tree",
+        "@mpc_utils//mpc_utils:status_matchers",
         "@mpc_utils//mpc_utils/testing:test_deps",
     ],
 )
@@ -41,6 +42,5 @@ cc_binary(
     deps = [
         ":ggm_tree",
         "@com_github_google_benchmark//:benchmark_main",
-        "@googletest//:gtest_main",
     ],
 )
