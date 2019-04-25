@@ -1,12 +1,11 @@
-// Single-Point FSS with known index (index provided by client)
-// A two party protocol involving a server and a client with:
-// Public input: integer N > 0.
-// Server input: an additive secret share of `val`,
-// client inputs: an additive secret share of `val`, and
-// an index 0 <= `index` <= N-1.
-// The output of the protocol is an additive secret share
-// of a vector `v` of length `N` such that
-// v is zero in all positions except N, where v[N] = val.
+// A two party protocol involving a server and a client with the following
+// inputs:
+//   Public: Integer N > 0.
+//   Server: An additive share of `val`,
+//   Client: An additive share of `val`, and an index 0 <= `index` <= N-1.
+// The output of the protocol is an additive secret share of a vector `v` of
+// length `N` such that `v` is zero in all positions except `index`, where
+// `v[index] = val`.
 
 #include "absl/types/span.h"
 #include "distributed_vector_ole/all_but_one_random_ot.h"
@@ -18,9 +17,9 @@
 
 namespace distributed_vector_ole {
 
-// This class implementes a a protocol for SPFSS with known
-// index as described above that is
-// based on (n-1)-out-of-n Random OT (by means of AllButOneRandomOT)
+// This class implementes a a protocol for SPFSS with known index as described
+// above that is based on (n-1)-out-of-n Random OT (by means of
+// AllButOneRandomOT)
 class SPFSSKnownIndex {
  public:
   // Creates an instance of SPFSSKnownIndex that communicates over the given
@@ -31,12 +30,12 @@ class SPFSSKnownIndex {
   // Runs the Server side of the protocol. `output` must point to an array of
   // pre-allocated Ts.
   template <typename T>
-  mpc_utils::Status RunServer(T val_share, absl::Span<T> output,
-                              mpc_utils::Benchmarker* benchmarker = nullptr) {
+  mpc_utils::Status RunServer(T val_share, absl::Span<T> output) {
     RETURN_IF_ERROR(all_but_one_rot_->RunServer(output));
     T sum = val_share;
     for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
       sum += output[i];
+      // Server negates their shares to obtain additively shared outputs.
       output[i] = -output[i];
     }
     channel_->send(sum);
@@ -47,8 +46,8 @@ class SPFSSKnownIndex {
   // Runs the Server side of the protocol. `output` must point to an array of
   // pre-allocated Ts, and `ìndex` must be between 0 and output.size() - 1.
   template <typename T>
-  mpc_utils::Status RunClient(T val_share, int64_t index, absl::Span<T> output,
-                              mpc_utils::Benchmarker* benchmarker = nullptr) {
+  mpc_utils::Status RunClient(T val_share, int64_t index,
+                              absl::Span<T> output) {
     RETURN_IF_ERROR(all_but_one_rot_->RunClient(index, output));
     T sum;
     channel_->recv(sum);
