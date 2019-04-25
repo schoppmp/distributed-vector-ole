@@ -1,4 +1,4 @@
-#include "ggm_tree.h"
+#include "distributed_vector_ole/ggm_tree.h"
 #include <cmath>
 #include "gtest/gtest.h"
 #include "mpc_utils/status_macros.h"
