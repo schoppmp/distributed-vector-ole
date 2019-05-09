@@ -7,13 +7,21 @@
 // length `N` such that `v` is zero in all positions except `index`, where
 // `v[index] = val`.
 
+#ifndef DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_
+#define DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_
+
 #include "absl/types/span.h"
 #include "distributed_vector_ole/all_but_one_random_ot.h"
 #include "mpc_utils/benchmarker.hpp"
 #include "mpc_utils/boost_serialization/abseil.hpp"
+#include "mpc_utils/boost_serialization/ntl.hpp"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_macros.h"
 #include "mpc_utils/statusor.h"
+
+// OpenMP custom reductions for NTL::ZZ_p and absl::uint128
+#pragma omp declare reduction(+: NTL::ZZ_p: omp_out += omp_in) initializer (omp_priv = NTL::ZZ_p(0))
+#pragma omp declare reduction(+: absl::uint128: omp_out += omp_in) initializer (omp_priv = 0)
 
 namespace distributed_vector_ole {
 
@@ -33,10 +41,20 @@ class SPFSSKnownIndex {
   mpc_utils::Status RunServer(T val_share, absl::Span<T> output) {
     RETURN_IF_ERROR(all_but_one_rot_->RunServer(output));
     T sum = val_share;
-    for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
-      sum += output[i];
-      // Server negates their shares to obtain additively shared outputs.
-      output[i] = -output[i];
+    NTL::ZZ_pContext context;
+    context.save();
+#pragma omp parallel
+    {
+      context.restore();
+#pragma omp for reduction(+ : sum) schedule(guided)
+      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+        sum += output[i];
+      }
+#pragma omp for schedule(guided)
+      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+        // Server negates their shares to obtain additively shared outputs.
+        output[i] = -output[i];
+      }
     }
     channel_->send(sum);
     channel_->flush();
@@ -49,15 +67,21 @@ class SPFSSKnownIndex {
   mpc_utils::Status RunClient(T val_share, int64_t index,
                               absl::Span<T> output) {
     RETURN_IF_ERROR(all_but_one_rot_->RunClient(index, output));
-    T sum;
-    channel_->recv(sum);
-    sum += val_share;
-    for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
-      if (i != index) {
-        sum -= output[i];
+    T sum(val_share), sum_server;
+    NTL::ZZ_pContext context;
+    context.save();
+#pragma omp parallel
+    {
+      context.restore();
+#pragma omp for reduction(+ : sum) schedule(guided)
+      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+        if (i != index) {
+          sum -= output[i];
+        }
       }
-    }
-    output[index] = sum;
+    };
+    channel_->recv(sum_server);
+    output[index] = sum + sum_server;
     return mpc_utils::OkStatus();
   }
 
@@ -69,3 +93,5 @@ class SPFSSKnownIndex {
   std::unique_ptr<AllButOneRandomOT> all_but_one_rot_;
 };
 }  // namespace distributed_vector_ole
+
+#endif  // DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_

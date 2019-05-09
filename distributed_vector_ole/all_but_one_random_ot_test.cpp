@@ -28,7 +28,12 @@ class AllButOneRandomOTTest : public ::testing::Test {
   void TestVector(int size, int index) {
     std::vector<T> output_0(size);
     std::vector<T> output_1(size);
-    std::thread thread1([this, &output_0] {
+
+    NTL::ZZ_pContext ntl_context;
+    ntl_context.save();
+    std::thread thread1([this, &output_0, &ntl_context] {
+      // Re-initialize modulus for current thread.
+      ntl_context.restore();
       EXPECT_TRUE(
           all_but_one_rot_0_
               ->RunServer(absl::MakeSpan(output_0.data(), output_0.size()))
@@ -59,6 +64,18 @@ class AllButOneRandomOTTest : public ::testing::Test {
     TestVector<int16_t>(size, index);
     TestVector<int32_t>(size, index);
     TestVector<int64_t>(size, index);
+    // NTL.
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(
+        "340282366920938463463374607431768211297"));  // 2^128 - 159
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("18446744073709551557"));  // 2^64 - 59
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("4294967291"));  // 2^32 - 5
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("65521"));  // 2^16 - 15
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("251"));  // 2^8 - 5
+    TestVector<NTL::ZZ_p>(size, index);
   }
 
   mpc_utils::testing::CommChannelTestHelper helper_;
@@ -74,7 +91,12 @@ TEST_F(AllButOneRandomOTTest, TestSmallVectors) {
   }
 }
 
-TEST_F(AllButOneRandomOTTest, TestLargeVector) { TestAllTypes(1234567, 1234); }
+TEST_F(AllButOneRandomOTTest, TestLargeVector) {
+  int size = 1234567, index = 1234;
+  TestVector<uint32_t>(size, index);
+  NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("18446744073709551557"));  // 2^64 - 59
+  TestVector<NTL::ZZ_p>(size, index);
+}
 
 TEST_F(AllButOneRandomOTTest, TestEmptyOutputServer) {
   auto status = all_but_one_rot_0_->RunClient(0, absl::Span<int>());

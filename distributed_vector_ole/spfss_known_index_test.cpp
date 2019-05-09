@@ -9,6 +9,8 @@
 
 namespace distributed_vector_ole {
 
+namespace {
+
 class SPFSSKnownIndexTest : public ::testing::Test {
  protected:
   SPFSSKnownIndexTest() : helper_(false) {}
@@ -24,11 +26,17 @@ class SPFSSKnownIndexTest : public ::testing::Test {
   }
 
   template <typename T>
-  void TestVector(int size, int index, T val_share_0 = 23, T val_share_1 = 42) {
+  void TestVector(int size, int index, T val_share_0 = T(23),
+                  T val_share_1 = T(42)) {
     T val = val_share_0 + val_share_1;
     std::vector<T> output_0(size);
     std::vector<T> output_1(size);
-    std::thread thread1([this, &output_0, val_share_0] {
+
+    NTL::ZZ_pContext ntl_context;
+    ntl_context.save();
+    std::thread thread1([this, &output_0, val_share_0, &ntl_context] {
+      // Re-initialize modulus for current thread.
+      ntl_context.restore();
       EXPECT_TRUE(spfss_known_index_0_
                       ->RunServer(val_share_0, absl::MakeSpan(output_0.data(),
                                                               output_0.size()))
@@ -63,6 +71,18 @@ class SPFSSKnownIndexTest : public ::testing::Test {
     TestVector<int16_t>(size, index);
     TestVector<int32_t>(size, index);
     TestVector<int64_t>(size, index);
+    // NTL.
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(
+        "340282366920938463463374607431768211297"));  // 2^128 - 159
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("18446744073709551557"));  // 2^64 - 59
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("4294967291"));  // 2^32 - 5
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("65521"));  // 2^16 - 15
+    TestVector<NTL::ZZ_p>(size, index);
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("251"));  // 2^8 - 5
+    TestVector<NTL::ZZ_p>(size, index);
   }
 
   mpc_utils::testing::CommChannelTestHelper helper_;
@@ -83,5 +103,7 @@ TEST(SPFSSKnownIndex, TestNullChannel) {
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.status().message(), "`channel` must not be NULL");
 }
+
+}  // namespace
 
 }  // namespace distributed_vector_ole

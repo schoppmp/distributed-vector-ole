@@ -23,7 +23,6 @@ cc_library(
 
 cc_test(
     name = "ggm_tree_test",
-    size = "small",
     srcs = [
         "ggm_tree_test.cpp",
     ],
@@ -57,15 +56,19 @@ cc_library(
     copts = [
         "-maes",
         "-msse4.2",
+        "-fopenmp",
+    ],
+    linkopts = [
+        "-lgomp",
     ],
     deps = [
         ":ggm_tree",
         "@abseil//absl/types:span",
+        "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
-        "@mpc_utils//third_party/emp:emp_ot",
-        "@mpc_utils//third_party/emp:emp_tool",
+        "@mpc_utils//third_party/ntl",
     ],
 )
 
@@ -102,6 +105,10 @@ cc_library(
     copts = [
         "-maes",
         "-msse4.2",
+        "-fopenmp",
+    ],
+    linkopts = [
+        "-lgomp",
     ],
     deps = [
         ":all_but_one_random_ot",
@@ -109,6 +116,7 @@ cc_library(
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils/boost_serialization:abseil",
+        "@mpc_utils//mpc_utils/boost_serialization:ntl",
     ],
 )
 
@@ -130,5 +138,27 @@ cc_test(
         "@mpc_utils//mpc_utils:statusor",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//mpc_utils/testing:test_deps",
+    ],
+)
+
+cc_binary(
+    name = "spfss_known_index_benchmark",
+    srcs = [
+        "spfss_known_index_benchmark.cpp",
+    ],
+    copts = [
+        "-maes",
+        "-msse4.2",
+        "-fopenmp",
+    ],
+    linkopts = [
+        "-lgomp",
+    ],
+    deps = [
+        ":spfss_known_index",
+        "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_github_google_benchmark//:benchmark_main",
+        "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
+        "@mpc_utils//third_party/gperftools",
     ],
 )

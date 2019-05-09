@@ -28,6 +28,30 @@ emp::block GGMTreeToEMPBlock(GGMTree::Block in) {
 }
 }  // namespace
 
+namespace all_but_one_random_ot_internal {
+
+void UnpackLastLevel(const GGMTree& tree, absl::Span<NTL::ZZ_p> output) {
+  // Save NTL context and restore it in each OMP thread.
+  NTL::ZZ_pContext context;
+  context.save();
+#pragma omp parallel
+  {
+    context.restore();
+    NTL::ZZ leaf_zz;
+#pragma omp for schedule(guided)
+    for (int64_t i = 0; i < tree.num_leaves(); ++i) {
+      // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
+      GGMTree::Block leaf = tree.GetValueAtLeaf(i).ValueOrDie();
+      leaf_zz = absl::Uint128High64(leaf);
+      leaf_zz <<= 64;
+      leaf_zz += absl::Uint128Low64(leaf);
+      output[i] = NTL::conv<NTL::ZZ_p>(leaf_zz);
+    }
+  };
+}
+
+}  // namespace all_but_one_random_ot_internal
+
 AllButOneRandomOT::AllButOneRandomOT(
     mpc_utils::comm_channel* channel,
     std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter)
@@ -48,11 +72,40 @@ AllButOneRandomOT::Create(comm_channel* channel) {
 }
 
 mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::ServerSendTree(
-    int64_t num_leaves, int arity) {
-  // Create tree from random seed.
-  GGMTree::Block seed;
-  RAND_bytes(reinterpret_cast<unsigned char*>(&seed), sizeof(seed));
-  ASSIGN_OR_RETURN(auto tree, GGMTree::Create(arity, num_leaves, seed));
+    int64_t num_leaves, int arity, const NTL::ZZ* modulus) {
+  std::unique_ptr<GGMTree> tree;
+  while (!tree) {
+    // Create tree from random seed.
+    GGMTree::Block seed;
+    RAND_bytes(reinterpret_cast<unsigned char*>(&seed), sizeof(seed));
+    ASSIGN_OR_RETURN(tree, GGMTree::Create(arity, num_leaves, seed));
+
+    if (modulus) {
+      // Re-sample tree if any leaf is too close to 2^128 to ensure values
+      // reduced modulo `modulus` have all equal probability.
+      NTL::ZZ upper_bound = (NTL::ZZ(1) << 128);
+      upper_bound -= upper_bound % *modulus;
+      bool tree_valid = true;
+
+#pragma omp parallel
+      {
+        NTL::ZZ leaf_zz;
+#pragma omp for reduction(& : tree_valid) schedule(guided)
+        for (int64_t i = 0; i < num_leaves; i++) {
+          // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
+          GGMTree::Block leaf = tree->GetValueAtLeaf(i).ValueOrDie();
+          leaf_zz = absl::Uint128High64(leaf);
+          leaf_zz <<= 64;
+          leaf_zz += absl::Uint128Low64(leaf);
+          tree_valid &= (leaf_zz < upper_bound);
+        }
+      }
+      if (!tree_valid) {
+        tree.reset();
+      }
+    }
+  }
+
   auto xors = tree->GetSiblingWiseXOR();
 
   std::vector<emp::block> opt0(tree->num_levels() - 1);
@@ -109,4 +162,5 @@ AllButOneRandomOT::ClientReceiveTree(int64_t num_leaves, int64_t index,
 
   return tree;
 }
+
 }  // namespace distributed_vector_ole
