@@ -24,6 +24,16 @@ def clean_dep(dep):
 def distributed_vector_ole_deps():
     # Initialize transitive dependencies.
     rules_foreign_cc_dependencies()
+    # Load EMP-OT before mpc_utils_deps() because we need a patched version.
+    # TODO(adria) merge this version upstream or put the patch in this repo.
+    if "com_github_emp_toolkit_emp_ot" not in native.existing_rules():
+        http_archive(
+            name = "com_github_emp_toolkit_emp_ot",
+            url = "https://github.com/adriagascon/emp-ot/archive/90319da396e731d0b24e90e1ccaa3b76fa73f641.zip",
+            sha256 = "8cc43964b0d1880429acf6dd972f1e080923c71d25127e74607f628b7cdc6c30",
+            strip_prefix = "emp-ot-90319da396e731d0b24e90e1ccaa3b76fa73f641",
+            build_file = clean_dep("@mpc_utils//third_party:emp_ot.BUILD"),
+        )
     mpc_utils_deps(enable_oblivc = False)
 
     if "org_gmplib" not in native.existing_rules():

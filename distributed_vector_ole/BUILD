@@ -1,3 +1,11 @@
+DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
+    "-maes",
+    "-msse4.2",
+    "-fopenmp",
+    "-Wno-ignored-attributes",
+    "-Wno-attributes",
+]
+
 cc_library(
     name = "ggm_tree",
     srcs = [
@@ -6,9 +14,7 @@ cc_library(
     hdrs = [
         "ggm_tree.h",
     ],
-    copts = [
-        "-fopenmp",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     linkopts = [
         "-lgomp",
     ],
@@ -53,11 +59,7 @@ cc_library(
     hdrs = [
         "all_but_one_random_ot.h",
     ],
-    copts = [
-        "-maes",
-        "-msse4.2",
-        "-fopenmp",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     linkopts = [
         "-lgomp",
     ],
@@ -77,10 +79,7 @@ cc_test(
     srcs = [
         "all_but_one_random_ot_test.cpp",
     ],
-    copts = [
-        "-maes",
-        "-msse4.2",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":all_but_one_random_ot",
         "@abseil//absl/memory",
@@ -102,11 +101,7 @@ cc_library(
     hdrs = [
         "spfss_known_index.h",
     ],
-    copts = [
-        "-maes",
-        "-msse4.2",
-        "-fopenmp",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     linkopts = [
         "-lgomp",
     ],
@@ -125,10 +120,7 @@ cc_test(
     srcs = [
         "spfss_known_index_test.cpp",
     ],
-    copts = [
-        "-maes",
-        "-msse4.2",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":spfss_known_index",
         "@abseil//absl/memory",
@@ -146,11 +138,7 @@ cc_binary(
     srcs = [
         "spfss_known_index_benchmark.cpp",
     ],
-    copts = [
-        "-maes",
-        "-msse4.2",
-        "-fopenmp",
-    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     linkopts = [
         "-lgomp",
     ],
@@ -160,5 +148,57 @@ cc_binary(
         "@com_github_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
+    ],
+)
+
+cc_library(
+    name = "gilboa_internal",
+    hdrs = [
+        "internal/gilboa_internal.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        "@abseil//absl/numeric:int128",
+        "@abseil//absl/types:span",
+        "@boringssl//:crypto",
+        "@mpc_utils//third_party/ntl",
+    ],
+)
+
+cc_library(
+    name = "scalar_vector_gilboa_product",
+    srcs = [
+        "scalar_vector_gilboa_product.cpp",
+    ],
+    hdrs = [
+        "scalar_vector_gilboa_product.h",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    deps = [
+        ":gilboa_internal",
+        "@abseil//absl/memory",
+        "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@mpc_utils//mpc_utils:comm_channel",
+        "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
+        "@mpc_utils//mpc_utils:openssl_uniform_bit_generator",
+        "@mpc_utils//mpc_utils:statusor",
+    ],
+)
+
+cc_test(
+    name = "scalar_vector_gilboa_test",
+    srcs = [
+        "scalar_vector_gilboa_product_test.cpp",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    deps = [
+        ":scalar_vector_gilboa_product",
+        "@abseil//absl/memory",
+        "@googletest//:gtest_main",
+        "@mpc_utils//mpc_utils:comm_channel",
+        "@mpc_utils//mpc_utils:status_matchers",
+        "@mpc_utils//mpc_utils:statusor",
+        "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
+        "@mpc_utils//mpc_utils/testing:test_deps",
     ],
 )
