@@ -1,45 +1,43 @@
+#include "NTL/ZZ_p.h"
 #include "benchmark/benchmark.h"
-#include "distributed_vector_ole/spfss_known_index.h"
+#include "distributed_vector_ole/scalar_vector_gilboa_product.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
 namespace {
 
 template <typename T, bool measure_communication>
-static void BM_RunNative(benchmark::State &state) {
+void BM_RunNative(benchmark::State &state) {
   mpc_utils::testing::CommChannelTestHelper helper(measure_communication);
   int64_t length = state.range(0);
   comm_channel *chan0 = helper.GetChannel(0);
   comm_channel *chan1 = helper.GetChannel(1);
 
-  // Spawn a thread that acts as the server.
+  // Spawn a thread that acts as the ValueProvider.
   NTL::ZZ_pContext ntl_context;
   ntl_context.save();
   std::thread thread1([chan1, length, &ntl_context] {
     ntl_context.restore();
-    auto spfss1 = SPFSSKnownIndex::Create(chan1).ValueOrDie();
+    auto gilboa1 = ScalarVectorGilboaProduct::Create(chan1).ValueOrDie();
     bool keep_running;
-    std::vector<T> output1(length);
-    T share1(23);
+    T x(23);
     do {
-      spfss1->RunValueProvider(share1, absl::MakeSpan(output1));
+      std::vector<T> output1 =
+          gilboa1->RunValueProvider(x, length).ValueOrDie();
       benchmark::DoNotOptimize(output1);
       chan1->recv(keep_running);
     } while (keep_running);
   });
 
-  // Run the client in the main thread.
-  auto spfss0 = SPFSSKnownIndex::Create(chan0).ValueOrDie();
-  std::vector<T> output0(length);
-  T share0(42);
-  int index = 0;
-  spfss0->RunIndexProvider(share0, index, absl::MakeSpan(output0));
+  auto gilboa0 = ScalarVectorGilboaProduct::Create(chan0).ValueOrDie();
+  std::vector<T> y(length);
+  std::iota(y.begin(), y.end(), T(0));
+  std::vector<T> output0 = gilboa0->RunVectorProvider<T>(y).ValueOrDie();
   for (auto _ : state) {
     chan0->send(true);
     chan0->flush();
-    spfss0->RunIndexProvider(share0, index, absl::MakeSpan(output0));
+    output0 = gilboa0->RunVectorProvider<T>(y).ValueOrDie();
     benchmark::DoNotOptimize(output0);
-    index++;
   }
   chan0->send(false);
   chan0->flush();
@@ -50,9 +48,9 @@ static void BM_RunNative(benchmark::State &state) {
     bytes_sent0 = chan0->get_num_bytes_sent();
     bytes_sent1 = chan1->get_num_bytes_sent();
   }
-  state.counters["BytesSentClient"] =
+  state.counters["BytesSentVectorProvider"] =
       benchmark::Counter(bytes_sent0, benchmark::Counter::kAvgIterations);
-  state.counters["BytesSentServer"] =
+  state.counters["BytesSentValueProvider"] =
       benchmark::Counter(bytes_sent1, benchmark::Counter::kAvgIterations);
 }
 

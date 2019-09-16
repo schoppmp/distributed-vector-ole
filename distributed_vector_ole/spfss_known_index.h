@@ -1,8 +1,9 @@
-// A two party protocol involving a server and a client with the following
-// inputs:
+// A two party protocol involving two parties with the following inputs:
+//
 //   Public: Integer N > 0.
-//   Server: An additive share of `val`,
-//   Client: An additive share of `val`, and an index 0 <= `index` <= N-1.
+//   Sender: An additive share of `val`, and an index 0 <= `index` <= N-1.
+//   Receiver: An additive share of `val`,
+//
 // The output of the protocol is an additive secret share of a vector `v` of
 // length `N` such that `v` is zero in all positions except `index`, where
 // `v[index] = val`.
@@ -33,57 +34,18 @@ class SPFSSKnownIndex {
   // Creates an instance of SPFSSKnownIndex that communicates over the given
   // comm_channel. This corresponds to an instance of AllButOneRandomOT.
   static mpc_utils::StatusOr<std::unique_ptr<SPFSSKnownIndex>> Create(
-      comm_channel* channel);
+      mpc_utils::comm_channel* channel);
 
   // Runs the Server side of the protocol. `output` must point to an array of
   // pre-allocated Ts.
   template <typename T>
-  mpc_utils::Status RunServer(T val_share, absl::Span<T> output) {
-    RETURN_IF_ERROR(all_but_one_rot_->RunServer(output));
-    T sum = val_share;
-    NTL::ZZ_pContext context;
-    context.save();
-#pragma omp parallel
-    {
-      context.restore();
-#pragma omp for reduction(+ : sum) schedule(guided)
-      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
-        sum += output[i];
-      }
-#pragma omp for schedule(guided)
-      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
-        // Server negates their shares to obtain additively shared outputs.
-        output[i] = -output[i];
-      }
-    }
-    channel_->send(sum);
-    channel_->flush();
-    return mpc_utils::OkStatus();
-  }
+  mpc_utils::Status RunValueProvider(T val_share, absl::Span<T> output);
 
-  // Runs the Server side of the protocol. `output` must point to an array of
+  // Runs the Client side of the protocol. `output` must point to an array of
   // pre-allocated Ts, and `ìndex` must be between 0 and output.size() - 1.
   template <typename T>
-  mpc_utils::Status RunClient(T val_share, int64_t index,
-                              absl::Span<T> output) {
-    RETURN_IF_ERROR(all_but_one_rot_->RunClient(index, output));
-    T sum(val_share), sum_server;
-    NTL::ZZ_pContext context;
-    context.save();
-#pragma omp parallel
-    {
-      context.restore();
-#pragma omp for reduction(+ : sum) schedule(guided)
-      for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
-        if (i != index) {
-          sum -= output[i];
-        }
-      }
-    };
-    channel_->recv(sum_server);
-    output[index] = sum + sum_server;
-    return mpc_utils::OkStatus();
-  }
+  mpc_utils::Status RunIndexProvider(T val_share, int64_t index,
+                                     absl::Span<T> output);
 
  private:
   SPFSSKnownIndex(mpc_utils::comm_channel* channel,
@@ -92,6 +54,59 @@ class SPFSSKnownIndex {
   mpc_utils::comm_channel* channel_;
   std::unique_ptr<AllButOneRandomOT> all_but_one_rot_;
 };
+
+template <typename T>
+mpc_utils::Status SPFSSKnownIndex::RunValueProvider(T val_share,
+                                                    absl::Span<T> output) {
+  RETURN_IF_ERROR(all_but_one_rot_->RunSender(output));
+  T sum(val_share);
+  NTL::ZZ_pContext context;
+  context.save();
+#pragma omp parallel
+  {
+    context.restore();
+#pragma omp for reduction(+ : sum) schedule(static)
+    for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+      sum += output[i];
+    }
+#pragma omp for schedule(static)
+    for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+      // Server negates their shares to obtain additively shared outputs.
+      output[i] = -output[i];
+    }
+  }
+  channel_->send(sum);
+  channel_->flush();
+  return mpc_utils::OkStatus();
+}
+
+template <typename T>
+mpc_utils::Status SPFSSKnownIndex::RunIndexProvider(T val_share, int64_t index,
+                                                    absl::Span<T> output) {
+  RETURN_IF_ERROR(all_but_one_rot_->RunReceiver(index, output));
+  T sum(val_share), sum_server;
+  NTL::ZZ_pContext context;
+  context.save();
+#pragma omp parallel
+  {
+    context.restore();
+#pragma omp for reduction(+ : sum) schedule(static)
+    for (int64_t i = 0; i < static_cast<int64_t>(output.size()); ++i) {
+      if (i != index) {
+        sum -= output[i];
+      }
+    }
+  }
+  try {
+    channel_->recv(sum_server);
+  } catch (boost::exception& ex) {
+    std::cerr << boost::diagnostic_information(ex);
+    throw;
+  }
+  output[index] = sum + sum_server;
+  return mpc_utils::OkStatus();
+}
+
 }  // namespace distributed_vector_ole
 
 #endif  // DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_

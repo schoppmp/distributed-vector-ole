@@ -69,7 +69,7 @@ void XORBlocks(absl::Span<const GGMTree::Block> in,
 }
 
 // Evaluates the PRG using the given seed and key.
-GGMTree::Block ComputePRG(const GGMTree::Block &seed, const AES_KEY &key) {
+GGMTree::Block ComputePRG(const GGMTree::Block& seed, const AES_KEY& key) {
   GGMTree::Block result;
   AES_encrypt(reinterpret_cast<const uint8_t*>(&seed),
               reinterpret_cast<uint8_t*>(&result), &key);
