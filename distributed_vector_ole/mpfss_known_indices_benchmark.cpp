@@ -1,9 +1,30 @@
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/spfss_known_index.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
+#include "mpfss_known_indices.h"
 
 namespace distributed_vector_ole {
 namespace {
+
+int GetNumIndicesForLength(int length) {
+  switch (length) {
+    case 1 << 10:
+      return 57;
+    case 1 << 12:
+      return 98;
+    case 1 << 14:
+      return 198;
+    case 1 << 16:
+      return 389;
+    case 1 << 18:
+      return 760;
+    case 1 << 20:
+      return 1419;
+    case 1 << 22:
+      return 2735;
+  }
+  return 0;
+}
 
 template <typename T, bool measure_communication>
 static void BM_RunNative(benchmark::State &state) {
@@ -17,27 +38,31 @@ static void BM_RunNative(benchmark::State &state) {
   ntl_context.save();
   std::thread thread1([chan1, length, &ntl_context] {
     ntl_context.restore();
-    auto spfss1 = SPFSSKnownIndex::Create(chan1).ValueOrDie();
+    auto mpfss1 = MPFSSKnownIndices::Create(chan1).ValueOrDie();
     bool keep_running;
     std::vector<T> output1(length);
-    T share1(23);
+    T x(23);
+    int y_len = GetNumIndicesForLength(length);
     do {
-      spfss1->RunValueProvider(share1, absl::MakeSpan(output1));
+      mpfss1->RunValueProviderVectorOLE(x, y_len, absl::MakeSpan(output1));
       benchmark::DoNotOptimize(output1);
       chan1->recv(keep_running);
     } while (keep_running);
   });
 
   // Run the client in the main thread.
-  auto spfss0 = SPFSSKnownIndex::Create(chan0).ValueOrDie();
+  auto mpfss0 = MPFSSKnownIndices::Create(chan0).ValueOrDie();
   std::vector<T> output0(length);
-  T share0(42);
+  std::vector<T> y(GetNumIndicesForLength(length));
+  std::iota(y.begin(), y.end(), T(42));
+  std::vector<int64_t> indices(GetNumIndicesForLength(length));
+  std::iota(indices.begin(), indices.end(), 0);
   int index = 0;
-  spfss0->RunIndexProvider(share0, index, absl::MakeSpan(output0));
+  mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
   for (auto _ : state) {
     chan0->send(true);
     chan0->flush();
-    spfss0->RunIndexProvider(share0, index, absl::MakeSpan(output0));
+    mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
     benchmark::DoNotOptimize(output0);
     index++;
   }
@@ -50,9 +75,9 @@ static void BM_RunNative(benchmark::State &state) {
     bytes_sent0 = chan0->get_num_bytes_sent();
     bytes_sent1 = chan1->get_num_bytes_sent();
   }
-  state.counters["BytesSentClient"] =
+  state.counters["BytesSentSender"] =
       benchmark::Counter(bytes_sent0, benchmark::Counter::kAvgIterations);
-  state.counters["BytesSentServer"] =
+  state.counters["BytesSentReceiver"] =
       benchmark::Counter(bytes_sent1, benchmark::Counter::kAvgIterations);
 }
 

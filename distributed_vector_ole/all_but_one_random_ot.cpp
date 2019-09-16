@@ -1,6 +1,6 @@
-// The server generates a GGMTree with N leaves and arity 2, and runs an
+// The sender generates a GGMTree with N leaves and arity 2, and runs an
 // 1-out-of-2 OT for each level of the tree, for the client to receive enough
-// information to generates the tree locally, up to one path of the client's
+// information to generates the tree locally, up to one path of the receiver's
 // choice. The messages in the OTs are, per each level, the xor of the
 // left(resp. right) children of all the nodes in that level. The OTs are
 // implemented using EMP.
@@ -28,30 +28,6 @@ emp::block GGMTreeToEMPBlock(GGMTree::Block in) {
 }
 }  // namespace
 
-namespace all_but_one_random_ot_internal {
-
-void UnpackLastLevel(const GGMTree& tree, absl::Span<NTL::ZZ_p> output) {
-  // Save NTL context and restore it in each OMP thread.
-  NTL::ZZ_pContext context;
-  context.save();
-#pragma omp parallel
-  {
-    context.restore();
-    NTL::ZZ leaf_zz;
-#pragma omp for schedule(guided)
-    for (int64_t i = 0; i < tree.num_leaves(); ++i) {
-      // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
-      GGMTree::Block leaf = tree.GetValueAtLeaf(i).ValueOrDie();
-      leaf_zz = absl::Uint128High64(leaf);
-      leaf_zz <<= 64;
-      leaf_zz += absl::Uint128Low64(leaf);
-      output[i] = NTL::conv<NTL::ZZ_p>(leaf_zz);
-    }
-  };
-}
-
-}  // namespace all_but_one_random_ot_internal
-
 AllButOneRandomOT::AllButOneRandomOT(
     mpc_utils::comm_channel* channel,
     std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter)
@@ -60,7 +36,7 @@ AllButOneRandomOT::AllButOneRandomOT(
       ot_extension_(channel_adapter_.get()) {}
 
 mpc_utils::StatusOr<std::unique_ptr<AllButOneRandomOT>>
-AllButOneRandomOT::Create(comm_channel* channel) {
+AllButOneRandomOT::Create(mpc_utils::comm_channel* channel) {
   if (!channel) {
     return mpc_utils::InvalidArgumentError("`channel` must not be NULL");
   }
@@ -71,7 +47,7 @@ AllButOneRandomOT::Create(comm_channel* channel) {
   return absl::WrapUnique(new AllButOneRandomOT(channel, std::move(adapter)));
 }
 
-mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::ServerSendTree(
+mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::SendTree(
     int64_t num_leaves, int arity, const NTL::ZZ* modulus) {
   std::unique_ptr<GGMTree> tree;
   while (!tree) {
@@ -90,7 +66,7 @@ mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::ServerSendTree(
 #pragma omp parallel
       {
         NTL::ZZ leaf_zz;
-#pragma omp for reduction(& : tree_valid) schedule(guided)
+#pragma omp for reduction(& : tree_valid) schedule(static)
         for (int64_t i = 0; i < num_leaves; i++) {
           // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
           GGMTree::Block leaf = tree->GetValueAtLeaf(i).ValueOrDie();
@@ -125,9 +101,8 @@ mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::ServerSendTree(
   return tree;
 }
 
-mpc_utils::StatusOr<std::unique_ptr<GGMTree>>
-AllButOneRandomOT::ClientReceiveTree(int64_t num_leaves, int64_t index,
-                                     int arity) {
+mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::ReceiveTree(
+    int64_t num_leaves, int64_t index, int arity) {
   int num_levels =
       static_cast<int>(1 + std::ceil(std::log(num_leaves) / std::log(arity)));
 

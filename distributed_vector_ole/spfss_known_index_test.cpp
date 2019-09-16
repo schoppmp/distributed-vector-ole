@@ -2,6 +2,7 @@
 #include <thread>
 #include <vector>
 #include "absl/memory/memory.h"
+#include "boost/container/vector.hpp"
 #include "gtest/gtest.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_matchers.h"
@@ -28,7 +29,8 @@ class SPFSSKnownIndexTest : public ::testing::Test {
   template <typename T>
   void TestVector(int size, int index, T val_share_0 = T(23),
                   T val_share_1 = T(42)) {
-    T val = val_share_0 + val_share_1;
+    T val = val_share_0;
+    val += val_share_1;
     std::vector<T> output_0(size);
     std::vector<T> output_1(size);
 
@@ -37,20 +39,22 @@ class SPFSSKnownIndexTest : public ::testing::Test {
     std::thread thread1([this, &output_0, val_share_0, &ntl_context] {
       // Re-initialize modulus for current thread.
       ntl_context.restore();
-      EXPECT_TRUE(spfss_known_index_0_
-                      ->RunServer(val_share_0, absl::MakeSpan(output_0.data(),
-                                                              output_0.size()))
-                      .ok());
+      EXPECT_TRUE(
+          spfss_known_index_0_
+              ->RunValueProvider(
+                  val_share_0, absl::MakeSpan(output_0.data(), output_0.size()))
+              .ok());
     });
     EXPECT_TRUE(
         spfss_known_index_1_
-            ->RunClient(val_share_1, index,
-                        absl::MakeSpan(output_1.data(), output_1.size()))
+            ->RunIndexProvider(val_share_1, index,
+                               absl::MakeSpan(output_1.data(), output_1.size()))
             .ok());
     thread1.join();
 
     for (int i = 0; i < size; i++) {
-      T sum = output_0[i] + output_1[i];
+      T sum = output_0[i];
+      sum += output_1[i];
       if (i != index) {
         EXPECT_EQ(sum, 0);
       } else {

@@ -36,13 +36,13 @@ class AllButOneRandomOTTest : public ::testing::Test {
       ntl_context.restore();
       EXPECT_TRUE(
           all_but_one_rot_0_
-              ->RunServer(absl::MakeSpan(output_0.data(), output_0.size()))
+              ->RunSender(absl::MakeSpan(output_0.data(), output_0.size()))
               .ok());
     });
-    EXPECT_TRUE(
-        all_but_one_rot_1_
-            ->RunClient(index, absl::MakeSpan(output_1.data(), output_1.size()))
-            .ok());
+    EXPECT_TRUE(all_but_one_rot_1_
+                    ->RunReceiver(
+                        index, absl::MakeSpan(output_1.data(), output_1.size()))
+                    .ok());
     thread1.join();
 
     for (int i = 0; i < size; i++) {
@@ -99,20 +99,20 @@ TEST_F(AllButOneRandomOTTest, TestLargeVector) {
 }
 
 TEST_F(AllButOneRandomOTTest, TestEmptyOutputServer) {
-  auto status = all_but_one_rot_0_->RunClient(0, absl::Span<int>());
+  auto status = all_but_one_rot_0_->RunReceiver(0, absl::Span<int>());
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`output` must not be empty");
 }
 
 TEST_F(AllButOneRandomOTTest, TestEmptyOutputClient) {
-  auto status = all_but_one_rot_1_->RunClient(0, absl::Span<int>());
+  auto status = all_but_one_rot_1_->RunReceiver(0, absl::Span<int>());
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`output` must not be empty");
 }
 
 TEST_F(AllButOneRandomOTTest, TestIndexNegative) {
   std::vector<int> dummy(100);
-  auto status = all_but_one_rot_1_->RunClient(
+  auto status = all_but_one_rot_1_->RunReceiver(
       -1, absl::MakeSpan(dummy.data(), dummy.size() + 1));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`index` out of range");
@@ -120,7 +120,7 @@ TEST_F(AllButOneRandomOTTest, TestIndexNegative) {
 
 TEST_F(AllButOneRandomOTTest, TestIndexTooLarge) {
   std::vector<int> dummy(100);
-  auto status = all_but_one_rot_1_->RunClient(
+  auto status = all_but_one_rot_1_->RunReceiver(
       dummy.size(), absl::MakeSpan(dummy.data(), dummy.size()));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`index` out of range");
