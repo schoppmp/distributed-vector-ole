@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
     "-maes",
     "-msse4.2",
@@ -59,10 +61,12 @@ cc_library(
     ],
     deps = [
         ":ggm_tree",
-        "@abseil//absl/types:span",
+        ":ntl_helpers",
         "@abseil//absl/numeric:int128",
+        "@abseil//absl/types:span",
+        "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@mpc_utils//third_party/ntl",
-    ]
+    ],
 )
 
 cc_library(
@@ -78,8 +82,8 @@ cc_library(
         "-lgomp",
     ],
     deps = [
-        ":ggm_tree",
         ":all_but_one_random_ot_internal",
+        ":ggm_tree",
         "@abseil//absl/types:span",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@mpc_utils//mpc_utils:benchmarker",
@@ -100,6 +104,7 @@ cc_test(
     ],
     deps = [
         ":all_but_one_random_ot",
+        ":ntl_helpers",
         "@abseil//absl/memory",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:comm_channel",
@@ -130,6 +135,7 @@ cc_library(
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils/boost_serialization:abseil",
         "@mpc_utils//mpc_utils/boost_serialization:ntl",
+        "@mpc_utils//third_party/ntl",
     ],
 )
 
@@ -140,6 +146,7 @@ cc_test(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":ntl_helpers",
         ":spfss_known_index",
         "@abseil//absl/memory",
         "@googletest//:gtest_main",
@@ -158,6 +165,7 @@ cc_binary(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":ntl_helpers",
         ":spfss_known_index",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_github_google_benchmark//:benchmark_main",
@@ -272,15 +280,38 @@ cc_binary(
 )
 
 cc_library(
+    name = "ntl_helpers",
+    srcs = [
+        "internal/ntl_helpers.cpp",
+    ],
+    hdrs = [
+        "internal/ntl_helpers.h",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    visibility = ["//visibility:private"],
+    deps = [
+        "@abseil//absl/meta:type_traits",
+        "@abseil//absl/numeric:int128",
+        "@abseil//absl/types:optional",
+        "@mpc_utils//third_party/ntl",
+    ],
+)
+
+cc_library(
     name = "gilboa_internal",
     hdrs = [
         "internal/gilboa_internal.h",
     ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     visibility = ["//visibility:private"],
     deps = [
+        ":ntl_helpers",
         "@abseil//absl/numeric:int128",
         "@abseil//absl/types:span",
         "@boringssl//:crypto",
+        "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@mpc_utils//mpc_utils:comm_channel",
+        "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
         "@mpc_utils//third_party/ntl",
     ],
 )
@@ -320,6 +351,7 @@ cc_test(
         "@mpc_utils//mpc_utils:statusor",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//mpc_utils/testing:test_deps",
+        "@mpc_utils//third_party/ntl",
     ],
 )
 
@@ -331,6 +363,54 @@ cc_binary(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":scalar_vector_gilboa_product",
+        "@com_github_google_benchmark//:benchmark_main",
+        "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
+        "@mpc_utils//third_party/gperftools",
+    ],
+)
+
+cc_library(
+    name = "distributed_vector_ole",
+    hdrs = [
+        "distributed_vector_ole.h",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    deps = [
+        ":mpfss_known_indices",
+        ":scalar_vector_gilboa_product",
+        "@mpc_utils//mpc_utils:openssl_uniform_bit_generator",
+        "@mpc_utils//mpc_utils/boost_serialization:eigen",
+        "@mpc_utils//third_party/eigen",
+    ],
+)
+
+cc_test(
+    name = "distributed_vector_ole_test",
+    srcs = [
+        "distributed_vector_ole_test.cpp",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    deps = [
+        ":distributed_vector_ole",
+        "@abseil//absl/memory",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+        "@mpc_utils//mpc_utils:comm_channel",
+        "@mpc_utils//mpc_utils:status_matchers",
+        "@mpc_utils//mpc_utils:statusor",
+        "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
+        "@mpc_utils//mpc_utils/testing:test_deps",
+    ],
+)
+
+cc_binary(
+    name = "distributed_vector_ole_benchmark",
+    srcs = [
+        "distributed_vector_ole_benchmark.cpp",
+    ],
+    copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
+    deps = [
+        ":distributed_vector_ole",
         "@com_github_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",

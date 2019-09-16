@@ -7,6 +7,14 @@ load(
     "@rules_foreign_cc//:workspace_definitions.bzl",
     "rules_foreign_cc_dependencies",
 )
+load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+)
 
 all_content = """
 filegroup(
@@ -24,6 +32,7 @@ def clean_dep(dep):
 def distributed_vector_ole_deps():
     # Initialize transitive dependencies.
     rules_foreign_cc_dependencies()
+
     # Load EMP-OT before mpc_utils_deps() because we need a patched version.
     # TODO(adria) merge this version upstream or put the patch in this repo.
     if "com_github_emp_toolkit_emp_ot" not in native.existing_rules():
@@ -35,6 +44,16 @@ def distributed_vector_ole_deps():
             build_file = clean_dep("@mpc_utils//third_party:emp_ot.BUILD"),
         )
     mpc_utils_deps(enable_oblivc = False)
+
+    container_repositories()
+
+    # Something needs a recend GlibC.
+    container_pull(
+        name = "archlinux_base",
+        digest = "sha256:29ef3558fb2f91376782e46415299cf85618aad3d2859fb4ce342a63087bc6a3",
+        registry = "index.docker.io",
+        repository = "archlinux/base",
+    )
 
     if "org_gmplib" not in native.existing_rules():
         http_archive(

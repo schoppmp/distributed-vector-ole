@@ -28,9 +28,12 @@ namespace distributed_vector_ole {
 class MPFSSKnownIndices {
  public:
   // Creates an instance of MPFSSKnownIndices that communicates over the
-  // given comm_channel.
+  // given comm_channel. Optionally accepts a pointer to an existing
+  // ScalarVectorGilboaProduct instance. If omitted, a new instance will be
+  // created and managed by this class.
   static mpc_utils::StatusOr<std::unique_ptr<MPFSSKnownIndices>> Create(
-      mpc_utils::comm_channel* channel);
+      mpc_utils::comm_channel* channel,
+      ScalarVectorGilboaProduct* gilboa = nullptr);
 
   // Does nothing if cached_output_size_ == output_size. Otherwise hashes the
   // interval [0, output_size) using hasher_, and saves the result in buckets_.
@@ -76,7 +79,8 @@ class MPFSSKnownIndices {
       std::unique_ptr<CuckooHasher> hasher,
       std::vector<std::unique_ptr<SPFSSKnownIndex>> spfss,
       std::vector<std::unique_ptr<mpc_utils::comm_channel>> channels,
-      std::unique_ptr<ScalarVectorGilboaProduct> gilboa);
+      std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa,
+      ScalarVectorGilboaProduct* gilboa);
 
   // Constants for cuckoo hashing.
   static const int kNumHashFunctions = 3;
@@ -104,8 +108,10 @@ class MPFSSKnownIndices {
   // Communication channels used by SPFSS instances.
   std::vector<std::unique_ptr<mpc_utils::comm_channel>> channels_;
 
-  // Gilboa multiplication instance.
-  std::unique_ptr<ScalarVectorGilboaProduct> gilboa_;
+  // Gilboa multiplication instance. If `gilboa` was not passed at construction,
+  // `gilboa_` it is equal to `owned_gilboa_.get()`.
+  std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa_;
+  ScalarVectorGilboaProduct* gilboa_;
 };
 
 template <typename T>
@@ -124,7 +130,7 @@ mpc_utils::Status MPFSSKnownIndices::RunValueProviderVectorOLE(
     val = T(0);
   }
 
-  NTL::ZZ_pContext context;
+  NTLContext<T> context;
   context.save();
 #pragma omp parallel num_threads(spfss_.size())
   {
@@ -196,11 +202,9 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
                    gilboa_->RunVectorProvider<T>(y_permuted));
 
   // Zero out `output`.
-  for (auto& val : output) {
-    val = T(0);
-  }
+  std::fill(output.begin(), output.end(), T(0));
 
-  NTL::ZZ_pContext context;
+  NTLContext<T> context;
   context.save();
 #pragma omp parallel num_threads(spfss_.size())
   {

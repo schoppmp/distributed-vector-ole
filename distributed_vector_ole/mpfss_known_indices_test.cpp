@@ -25,15 +25,14 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
     thread1.join();
   }
 
-  void TestVectorOLE() {
-    int len = 100;
+  void TestVectorOLE(int len) {
     T x(2);
-    std::vector<T> y({T(1), T(2), T(3)});
-    std::vector<int64_t> indices = {23, 0, 42};
+    std::vector<T> y({T(42)});
+    std::vector<int64_t> indices = {0};
     std::vector<T> output_0(len), output_1(len);
 
     // Run protocol.
-    NTL::ZZ_pContext ntl_context;
+    NTLContext<T> ntl_context;
     ntl_context.save();
     std::thread thread1([this, &output_1, &y, &indices, &ntl_context] {
       ntl_context.restore();
@@ -70,23 +69,39 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
 
 using MPFSSKnownIndicesTypes =
     ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t, absl::uint128,
-                     NTL::ZZ_p>;
+                     NTL::ZZ_p, NTL::zz_p>;
 TYPED_TEST_SUITE(MPFSSKnownIndicesTest, MPFSSKnownIndicesTypes);
 
 TYPED_TEST(MPFSSKnownIndicesTest, TestVectorOLE) {
-  if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
-    for (const auto &prime : {
-             "340282366920938463463374607431768211297",  // 2^128 - 159
-             "18446744073709551557",                     // 2^64 - 59
-             "4294967291",                               // 2^32 - 5
-             "65521",                                    // 2^16 - 15
-             "251"                                       // 2^8 - 5
-         }) {
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(prime));
-      this->TestVectorOLE();
+  for (int size = 1; size < 50; size+=10) {
+    if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
+      for (const auto &modulus : {
+          "340282366920938463463374607431768211456",  // 2^128 (the largest
+                                                      // modulus we
+                                                      // support)
+          // Prime moduli:
+          "340282366920938463463374607431768211297",  // 2^128 - 159
+          "18446744073709551557",                     // 2^64 - 59
+          "4294967291",                               // 2^32 - 5
+          "65521",                                    // 2^16 - 15
+          "251"                                       // 2^8 - 5
+      }) {
+        NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
+        this->TestVectorOLE(size);
+      }
+    } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
+      for (int64_t modulus : {
+          1125899906842597L,  // 2^50 - 27
+          4294967291L,        // 2^32 - 5
+          65521L,             // 2^16 - 15
+          251L                // 2^8 - 5
+      }) {
+        NTL::zz_p::init(modulus);
+        this->TestVectorOLE(size);
+      }
+    } else {
+      this->TestVectorOLE(size);
     }
-  } else {
-    this->TestVectorOLE();
   }
 }
 

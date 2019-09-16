@@ -11,9 +11,10 @@ static void BM_RunNative(benchmark::State &state) {
   int64_t length = state.range(0);
   comm_channel *chan0 = helper.GetChannel(0);
   comm_channel *chan1 = helper.GetChannel(1);
+  emp::initialize_relic();
 
   // Spawn a thread that acts as the server.
-  NTL::ZZ_pContext ntl_context;
+  NTLContext<T> ntl_context;
   ntl_context.save();
   std::thread thread1([chan1, length, &ntl_context] {
     ntl_context.restore();
@@ -39,7 +40,7 @@ static void BM_RunNative(benchmark::State &state) {
     chan0->flush();
     spfss0->RunIndexProvider(share0, index, absl::MakeSpan(output0));
     benchmark::DoNotOptimize(output0);
-    index++;
+    index = (index + 1) % length;
   }
   chan0->send(false);
   chan0->flush();
@@ -56,29 +57,34 @@ static void BM_RunNative(benchmark::State &state) {
       benchmark::Counter(bytes_sent1, benchmark::Counter::kAvgIterations);
 }
 
-template <int num_bits, bool measure_communication>
+template <typename T, int num_bits, bool measure_communication>
 static void BM_RunNTL(benchmark::State &state) {
   switch (num_bits) {
     case 8:
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("251"));  // 2^8 - 5
+      T::init(NTL::conv<typename T::rep_type>("251"));  // 2^8 - 5
       break;
     case 16:
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("65521"));  // 2^16 - 15
+      T::init(NTL::conv<typename T::rep_type>("65521"));  // 2^16 - 15
       break;
     case 32:
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("4294967291"));  // 2^32 - 5
+      T::init(NTL::conv<typename T::rep_type>("4294967291"));  // 2^32 - 5
+      break;
+    case 60:
+      T::init(
+          NTL::conv<typename T::rep_type>("1152921504606846883"));  // 2^60 - 93
       break;
     case 64:
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("18446744073709551557"));  // 2^64 - 59
+      T::init(NTL::conv<typename T::rep_type>(
+          "18446744073709551557"));  // 2^64 - 59
       break;
     case 128:
-      NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(
+      T::init(NTL::conv<typename T::rep_type>(
           "340282366920938463463374607431768211297"));  // 2^128 - 159
       break;
     default:
       assert(false);  // Unimplemented.
   }
-  BM_RunNative<NTL::ZZ_p, measure_communication>(state);
+  BM_RunNative<T, measure_communication>(state);
 }
 
 // Timing (native).
@@ -98,20 +104,37 @@ BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 
-// Timing (NTL).
-BENCHMARK_TEMPLATE(BM_RunNTL, 8, false)
+// Timing (ZZ_p).
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 8, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 16, false)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 16, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 32, false)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 32, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 64, false)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 60, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 128, false)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 64, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 128, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+
+// Timing (zz_p).
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 8, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 16, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 32, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 60, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 
@@ -132,20 +155,37 @@ BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 
-// Communication (NTL).
-BENCHMARK_TEMPLATE(BM_RunNTL, 8, true)
+// Communication (ZZ_p).
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 8, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 16, true)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 16, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 32, true)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 32, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 64, true)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 60, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
-BENCHMARK_TEMPLATE(BM_RunNTL, 128, true)
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 64, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 128, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+
+// Communication (zz_p).
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 8, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 16, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 32, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNTL, NTL::zz_p, 60, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 
