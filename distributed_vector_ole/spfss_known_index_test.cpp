@@ -1,4 +1,5 @@
 #include "distributed_vector_ole/spfss_known_index.h"
+#include "distributed_vector_ole/internal/ntl_helpers.h"
 #include <thread>
 #include <vector>
 #include "absl/memory/memory.h"
@@ -7,11 +8,13 @@
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_matchers.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
+#include "NTL/lzz_p.h"
 
 namespace distributed_vector_ole {
 
 namespace {
 
+template<typename T>
 class SPFSSKnownIndexTest : public ::testing::Test {
  protected:
   SPFSSKnownIndexTest() : helper_(false) {}
@@ -26,7 +29,6 @@ class SPFSSKnownIndexTest : public ::testing::Test {
     thread1.join();
   }
 
-  template <typename T>
   void TestVector(int size, int index, T val_share_0 = T(23),
                   T val_share_1 = T(42)) {
     T val = val_share_0;
@@ -34,7 +36,7 @@ class SPFSSKnownIndexTest : public ::testing::Test {
     std::vector<T> output_0(size);
     std::vector<T> output_1(size);
 
-    NTL::ZZ_pContext ntl_context;
+    NTLContext<T> ntl_context;
     ntl_context.save();
     std::thread thread1([this, &output_0, val_share_0, &ntl_context] {
       // Re-initialize modulus for current thread.
@@ -63,41 +65,46 @@ class SPFSSKnownIndexTest : public ::testing::Test {
     }
   }
 
-  void TestAllTypes(int size, int index) {
-    // Unsigned.
-    TestVector<uint8_t>(size, index);
-    TestVector<uint16_t>(size, index);
-    TestVector<uint32_t>(size, index);
-    TestVector<uint64_t>(size, index);
-    TestVector<absl::uint128>(size, index);
-    // Signed.
-    TestVector<int8_t>(size, index);
-    TestVector<int16_t>(size, index);
-    TestVector<int32_t>(size, index);
-    TestVector<int64_t>(size, index);
-    // NTL.
-    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(
-        "340282366920938463463374607431768211297"));  // 2^128 - 159
-    TestVector<NTL::ZZ_p>(size, index);
-    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("18446744073709551557"));  // 2^64 - 59
-    TestVector<NTL::ZZ_p>(size, index);
-    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("4294967291"));  // 2^32 - 5
-    TestVector<NTL::ZZ_p>(size, index);
-    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("65521"));  // 2^16 - 15
-    TestVector<NTL::ZZ_p>(size, index);
-    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>("251"));  // 2^8 - 5
-    TestVector<NTL::ZZ_p>(size, index);
-  }
-
   mpc_utils::testing::CommChannelTestHelper helper_;
   std::unique_ptr<SPFSSKnownIndex> spfss_known_index_0_;
   std::unique_ptr<SPFSSKnownIndex> spfss_known_index_1_;
 };
 
-TEST_F(SPFSSKnownIndexTest, TestSmallVectors) {
+using MyTypes = ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t,
+                                 absl::uint128, NTL::ZZ_p, NTL::zz_p>;
+TYPED_TEST_SUITE(SPFSSKnownIndexTest, MyTypes);
+
+TYPED_TEST(SPFSSKnownIndexTest, TestSmallVectors) {
   for (int size = 1; size < 15; size++) {
     for (int index = 0; index < size; index++) {
-      TestAllTypes(size, index);
+      if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
+        for (const auto &modulus : {
+            "340282366920938463463374607431768211456",  // 2^128 (the largest
+                                                        // modulus we
+                                                        // support)
+            // Prime moduli:
+            "340282366920938463463374607431768211297",  // 2^128 - 159
+            "18446744073709551557",                     // 2^64 - 59
+            "4294967291",                               // 2^32 - 5
+            "65521",                                    // 2^16 - 15
+            "251"                                       // 2^8 - 5
+        }) {
+          NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
+          this->TestVector(size, index);
+        }
+      } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
+        for (int64_t modulus : {
+            1125899906842597L,  // 2^50 - 27
+            4294967291L,        // 2^32 - 5
+            65521L,             // 2^16 - 15
+            251L                // 2^8 - 5
+        }) {
+          NTL::zz_p::init(modulus);
+          this->TestVector(size, index);
+        }
+      } else {
+        this->TestVector(size, index);
+      }
     }
   }
 }

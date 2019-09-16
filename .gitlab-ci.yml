@@ -4,11 +4,43 @@ variables:
 build_all:
   image: $REGISTRY/ti/software/bazel-builder:latest
   stage: build
+  tags:
+    - aes
   script:
     - bazel build ...
-    - bazel test //distributed_vector_ole/... # Don't test EMP on the CI, because we don't have AES-NI there.
+    - bazel test ...
     - mkdir logs && cp -rL bazel-testlogs/* logs  # Artifacts have to be in the workspace, but bazel-testlogs is a symlink that points outside of it.
   artifacts:
     when: always
     paths:
       - logs
+
+deploy:
+  image: docker:stable
+  stage: deploy
+  tags:
+    - dockerimage
+  services:
+    - docker:dind  # Needed until container_push works (https://github.com/google/containerregistry/issues/42)
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $REGISTRY
+  script:
+    - docker run --rm
+        -e CACHE_USER="$CACHE_USER"
+        -e CACHE_PASSWORD="$CACHE_PASSWORD"
+        -v /var/run/docker.sock:/var/run/docker.sock
+        -v "$PWD":/data "$REGISTRY"/ti/software/bazel-builder:latest
+        "cd /data && bazel run -c opt //experiments:deploy"
+    - docker images --format "{{.Repository}} {{.Tag}}"
+      | grep -E "^$REGISTRY/$CI_PROJECT_PATH"
+      | grep -E 'latest$'
+      | cut -d" " -f1
+      | while read image; do
+          docker tag $image $image:$CI_COMMIT_SHA;
+          docker tag $image $image:$CI_COMMIT_REF_SLUG;
+          docker push $image:$CI_COMMIT_SHA;
+          docker push $image:$CI_COMMIT_REF_SLUG;
+          if [ "$CI_COMMIT_REF_SLUG" = "master" ]; then
+            docker push $image:latest;
+          fi;
+        done;

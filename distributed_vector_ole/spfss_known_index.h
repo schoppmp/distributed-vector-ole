@@ -1,8 +1,8 @@
 // A two party protocol involving two parties with the following inputs:
 //
 //   Public: Integer N > 0.
-//   Sender: An additive share of `val`, and an index 0 <= `index` <= N-1.
-//   Receiver: An additive share of `val`,
+//   IndexProvider: An additive share of `val`, and an index 0 <= `index` <=
+//   N-1. ValueProvider: An additive share of `val`,
 //
 // The output of the protocol is an additive secret share of a vector `v` of
 // length `N` such that `v` is zero in all positions except `index`, where
@@ -11,6 +11,8 @@
 #ifndef DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_
 #define DISTRIBUTED_VECTOR_OLE_SPFSS_KNOWN_INDEX_H_
 
+#include "NTL/ZZ_p.h"
+#include "NTL/lzz_p.h"
 #include "absl/types/span.h"
 #include "distributed_vector_ole/all_but_one_random_ot.h"
 #include "mpc_utils/benchmarker.hpp"
@@ -22,6 +24,7 @@
 
 // OpenMP custom reductions for NTL::ZZ_p and absl::uint128
 #pragma omp declare reduction(+: NTL::ZZ_p: omp_out += omp_in) initializer (omp_priv = NTL::ZZ_p(0))
+#pragma omp declare reduction(+: NTL::zz_p: omp_out += omp_in) initializer (omp_priv = NTL::zz_p(0))
 #pragma omp declare reduction(+: absl::uint128: omp_out += omp_in) initializer (omp_priv = 0)
 
 namespace distributed_vector_ole {
@@ -36,16 +39,33 @@ class SPFSSKnownIndex {
   static mpc_utils::StatusOr<std::unique_ptr<SPFSSKnownIndex>> Create(
       mpc_utils::comm_channel* channel);
 
-  // Runs the Server side of the protocol. `output` must point to an array of
-  // pre-allocated Ts.
+  // Runs the ValueProvider side of the protocol. `output` must point to an
+  // array of pre-allocated Ts.
   template <typename T>
   mpc_utils::Status RunValueProvider(T val_share, absl::Span<T> output);
+  template <typename T>
+  mpc_utils::StatusOr<std::vector<T>> RunValueProvider(T val_share,
+                                                       int64_t size) {
+    std::vector<T> output(size);
+    RETURN_IF_ERROR(RunValueProvider<T>(val_share, absl::MakeSpan(output)));
+    return output;
+  }
 
-  // Runs the Client side of the protocol. `output` must point to an array of
-  // pre-allocated Ts, and `ìndex` must be between 0 and output.size() - 1.
+  // Runs the IndexProvider side of the protocol. `output` must point to an
+  // array of pre-allocated Ts, and `ìndex` must be between 0 and output.size()
+  // - 1.
   template <typename T>
   mpc_utils::Status RunIndexProvider(T val_share, int64_t index,
                                      absl::Span<T> output);
+  template <typename T>
+  mpc_utils::StatusOr<std::vector<T>> RunIndexProvider(T val_share,
+                                                       int64_t index,
+                                                       int64_t size) {
+    std::vector<T> output(size);
+    RETURN_IF_ERROR(
+        RunIndexProvider<T>(val_share, index, absl::MakeSpan(output)));
+    return output;
+  }
 
  private:
   SPFSSKnownIndex(mpc_utils::comm_channel* channel,
@@ -60,7 +80,7 @@ mpc_utils::Status SPFSSKnownIndex::RunValueProvider(T val_share,
                                                     absl::Span<T> output) {
   RETURN_IF_ERROR(all_but_one_rot_->RunSender(output));
   T sum(val_share);
-  NTL::ZZ_pContext context;
+  NTLContext<T> context;
   context.save();
 #pragma omp parallel
   {
@@ -85,7 +105,7 @@ mpc_utils::Status SPFSSKnownIndex::RunIndexProvider(T val_share, int64_t index,
                                                     absl::Span<T> output) {
   RETURN_IF_ERROR(all_but_one_rot_->RunReceiver(index, output));
   T sum(val_share), sum_server;
-  NTL::ZZ_pContext context;
+  NTLContext<T> context;
   context.save();
 #pragma omp parallel
   {

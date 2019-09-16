@@ -1,7 +1,6 @@
 #include "benchmark/benchmark.h"
-#include "distributed_vector_ole/spfss_known_index.h"
+#include "distributed_vector_ole/mpfss_known_indices.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
-#include "mpfss_known_indices.h"
 
 namespace distributed_vector_ole {
 namespace {
@@ -32,9 +31,10 @@ static void BM_RunNative(benchmark::State &state) {
   int64_t length = state.range(0);
   comm_channel *chan0 = helper.GetChannel(0);
   comm_channel *chan1 = helper.GetChannel(1);
+  emp::initialize_relic();
 
   // Spawn a thread that acts as the server.
-  NTL::ZZ_pContext ntl_context;
+  NTLContext<T> ntl_context;
   ntl_context.save();
   std::thread thread1([chan1, length, &ntl_context] {
     ntl_context.restore();
@@ -57,14 +57,12 @@ static void BM_RunNative(benchmark::State &state) {
   std::iota(y.begin(), y.end(), T(42));
   std::vector<int64_t> indices(GetNumIndicesForLength(length));
   std::iota(indices.begin(), indices.end(), 0);
-  int index = 0;
   mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
   for (auto _ : state) {
     chan0->send(true);
     chan0->flush();
     mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
     benchmark::DoNotOptimize(output0);
-    index++;
   }
   chan0->send(false);
   chan0->flush();
