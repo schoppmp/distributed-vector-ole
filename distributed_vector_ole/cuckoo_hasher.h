@@ -1,9 +1,25 @@
-// A CuckooHasher allows to hash collections of arbitrary types using simple
-// hashing and cuckoo hashing. It is used to implement batching in various
-// protocols.
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef DISTRIBUTED_VECTOR_OLE_CUCKOO_HASHER_H_
 #define DISTRIBUTED_VECTOR_OLE_CUCKOO_HASHER_H_
+
+// A CuckooHasher allows to hash collections of arbitrary types using simple
+// hashing and cuckoo hashing. It is used to implement batching in various
+// protocols.
 
 #include <omp.h>
 #include <vector>

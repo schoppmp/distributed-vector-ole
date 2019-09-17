@@ -1,3 +1,22 @@
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#ifndef DISTRIBUTED_VECTOR_OLE_MPFSS_KNOWN_INDICES_H_
+#define DISTRIBUTED_VECTOR_OLE_MPFSS_KNOWN_INDICES_H_
+
 // Two-Party Multi-Point Function Secret-Sharing, where one party knows the set
 // of indices. Inputs:
 //
@@ -11,9 +30,6 @@
 // where `v[indices[i]] = z[i]`.
 // We also implement a variant where `z` is not secret-shared, but the product
 // of a vector `y` held by the sender, and a scalar `x` held by the receiver.
-
-#ifndef DISTRIBUTED_VECTOR_OLE_MPFSS_KNOWN_INDICES_H_
-#define DISTRIBUTED_VECTOR_OLE_MPFSS_KNOWN_INDICES_H_
 
 #include <algorithm>
 #include "NTL/ZZ_p.h"

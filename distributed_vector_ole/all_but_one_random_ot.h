@@ -1,9 +1,25 @@
-// (N-1)-out-of-N Random OT
-// The sender and the receiver obtain the same random vector of lengh `N`,
-// except for the ith position, for which the receiver obtains nothing.
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef DISTRIBUTED_VECTOR_OLE_ALL_BUT_ONE_RANDOM_OT_H_
 #define DISTRIBUTED_VECTOR_OLE_ALL_BUT_ONE_RANDOM_OT_H_
+
+// (N-1)-out-of-N Random OT
+// The sender and the receiver obtain the same random vector of lengh `N`,
+// except for the ith position, for which the receiver obtains nothing.
 
 #include <vector>
 #include "NTL/ZZ_p.h"

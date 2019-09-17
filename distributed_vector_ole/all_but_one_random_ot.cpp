@@ -1,13 +1,29 @@
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#include "distributed_vector_ole/all_but_one_random_ot.h"
+#include "absl/memory/memory.h"
+#include "boost/container/vector.hpp"
+
 // The sender generates a GGMTree with N leaves and arity 2, and runs an
 // 1-out-of-2 OT for each level of the tree, for the client to receive enough
 // information to generates the tree locally, up to one path of the receiver's
 // choice. The messages in the OTs are, per each level, the xor of the
 // left(resp. right) children of all the nodes in that level. The OTs are
 // implemented using EMP.
-
-#include "distributed_vector_ole/all_but_one_random_ot.h"
-#include "absl/memory/memory.h"
-#include "boost/container/vector.hpp"
 
 namespace distributed_vector_ole {
 

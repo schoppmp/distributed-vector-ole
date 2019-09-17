@@ -1,3 +1,22 @@
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#ifndef DISTRIBUTED_VECTOR_OLE_GGM_TREE_H_
+#define DISTRIBUTED_VECTOR_OLE_GGM_TREE_H_
+
 // Implements a tree that expands a single PRG seed to arbitrary lengths,
 // following the GGM construction [1]. Each inner node has b children, where b
 // is the tree's arity. The tree is built starting from the root, and each
@@ -15,9 +34,6 @@
 // random functions." Journal of the ACM (JACM) 33.4 (1986): 792-807.
 // [2] Doerner, Jack, and Abhi Shelat. "Scaling ORAM for Secure Computation."
 // CCS, ACM, 2017, pp. 523–535.
-
-#ifndef DISTRIBUTED_VECTOR_OLE_GGM_TREE_H_
-#define DISTRIBUTED_VECTOR_OLE_GGM_TREE_H_
 
 #include <cstdint>
 #include <vector>

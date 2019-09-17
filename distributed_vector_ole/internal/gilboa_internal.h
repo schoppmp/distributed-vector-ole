@@ -1,7 +1,23 @@
-// Helper functions for computing Gilboa products with arbitrary types.
+//    Distributed Vector-OLE
+//    Copyright (C) 2019 Phillipp Schoppmann and Adria Gascon
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU Affero General Public License as
+//    published by the Free Software Foundation, either version 3 of the
+//    License, or (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU Affero General Public License for more details.
+//
+//    You should have received a copy of the GNU Affero General Public License
+//    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #ifndef DISTRIBUTED_VECTOR_OLE_INTERNAL_GILBOA_INTERNAL_H_
 #define DISTRIBUTED_VECTOR_OLE_INTERNAL_GILBOA_INTERNAL_H_
+
+// Helper functions for computing Gilboa products with arbitrary types.
 
 #include "NTL/ZZ_p.h"
 #include "NTL/vec_ZZ_p.h"
