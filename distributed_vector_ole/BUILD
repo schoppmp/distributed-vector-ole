@@ -17,11 +17,8 @@
 package(default_visibility = ["//visibility:public"])
 
 DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
-    "-maes",
-    "-msse4.2",
     "-fopenmp",
-    "-Wno-ignored-attributes",
-    "-Wno-attributes",
+    "-Wno-ignored-attributes",  # Needed for std::vector<emp::block>
 ]
 
 cc_library(
@@ -37,10 +34,10 @@ cc_library(
         "-lgomp",
     ],
     deps = [
-        "@abseil//absl/memory",
-        "@abseil//absl/numeric:int128",
-        "@abseil//absl/types:span",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:statusor",
     ],
 )
@@ -78,9 +75,9 @@ cc_library(
     deps = [
         ":ggm_tree",
         ":ntl_helpers",
-        "@abseil//absl/numeric:int128",
-        "@abseil//absl/types:span",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//third_party/ntl",
     ],
 )
@@ -100,8 +97,8 @@ cc_library(
     deps = [
         ":all_but_one_random_ot_internal",
         ":ggm_tree",
-        "@abseil//absl/types:span",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
@@ -121,7 +118,7 @@ cc_test(
     deps = [
         ":all_but_one_random_ot",
         ":ntl_helpers",
-        "@abseil//absl/memory",
+        "@com_google_absl//absl/memory",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
@@ -146,7 +143,7 @@ cc_library(
     ],
     deps = [
         ":all_but_one_random_ot",
-        "@abseil//absl/types:span",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils/boost_serialization:abseil",
@@ -164,7 +161,7 @@ cc_test(
     deps = [
         ":ntl_helpers",
         ":spfss_known_index",
-        "@abseil//absl/memory",
+        "@com_google_absl//absl/memory",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:status_matchers",
@@ -204,11 +201,11 @@ cc_library(
     ],
     deps = [
         ":all_but_one_random_ot",
-        "@abseil//absl/memory",
-        "@abseil//absl/strings",
-        "@abseil//absl/types:optional",
-        "@abseil//absl/types:span",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:status",
         "@mpc_utils//mpc_utils:statusor",
         "@mpc_utils//third_party/ntl",
@@ -223,8 +220,8 @@ cc_test(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":cuckoo_hasher",
-        "@abseil//absl/container:flat_hash_map",
-        "@abseil//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:status_matchers",
         "@mpc_utils//mpc_utils/testing:test_deps",
@@ -257,9 +254,9 @@ cc_library(
         ":cuckoo_hasher",
         ":scalar_vector_gilboa_product",
         ":spfss_known_index",
-        "@abseil//absl/container:flat_hash_set",
-        "@abseil//absl/memory",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -271,7 +268,7 @@ cc_test(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":mpfss_known_indices",
-        "@abseil//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:status_matchers",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
@@ -306,9 +303,9 @@ cc_library(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     visibility = ["//visibility:private"],
     deps = [
-        "@abseil//absl/meta:type_traits",
-        "@abseil//absl/numeric:int128",
-        "@abseil//absl/types:optional",
+        "@com_google_absl//absl/meta:type_traits",
+        "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:optional",
         "@mpc_utils//third_party/ntl",
     ],
 )
@@ -322,10 +319,10 @@ cc_library(
     visibility = ["//visibility:private"],
     deps = [
         ":ntl_helpers",
-        "@abseil//absl/numeric:int128",
-        "@abseil//absl/types:span",
         "@boringssl//:crypto",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
         "@mpc_utils//third_party/ntl",
@@ -343,8 +340,8 @@ cc_library(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":gilboa_internal",
-        "@abseil//absl/memory",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_google_absl//absl/memory",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
         "@mpc_utils//mpc_utils:openssl_uniform_bit_generator",
@@ -360,7 +357,7 @@ cc_test(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":scalar_vector_gilboa_product",
-        "@abseil//absl/memory",
+        "@com_google_absl//absl/memory",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:status_matchers",
@@ -408,7 +405,7 @@ cc_test(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":distributed_vector_ole",
-        "@abseil//absl/memory",
+        "@com_google_absl//absl/memory",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
         "@mpc_utils//mpc_utils:comm_channel",
