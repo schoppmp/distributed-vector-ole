@@ -18,11 +18,8 @@ load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle")
 
 DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
-    "-maes",
-    "-msse4.2",
     "-fopenmp",
-    "-Wno-ignored-attributes",
-    "-Wno-attributes",
+    "-Wno-ignored-attributes",  # Needed for std::vector<emp::block>
 ]
 
 cc_binary(
@@ -37,7 +34,7 @@ cc_binary(
     deps = [
         "//distributed_vector_ole",
         "//distributed_vector_ole:scalar_vector_gilboa_product",
-        "@abseil//absl/strings",
+        "@com_google_absl//absl/strings",
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:mpc_config",

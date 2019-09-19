@@ -20,8 +20,8 @@
 // Helper functions for computing Gilboa products with arbitrary types.
 
 #include "NTL/ZZ_p.h"
-#include "NTL/vec_ZZ_p.h"
 #include "NTL/lzz_p.h"
+#include "NTL/vec_ZZ_p.h"
 #include "NTL/vec_lzz_p.h"
 #include "absl/meta/type_traits.h"
 #include "absl/numeric/int128.h"
@@ -124,7 +124,7 @@ vector<T> EMPBlockToVector(emp::block b) {
 
 // Correlated OT for integers modulo 2^b.
 template <typename T, typename std::enable_if<
-    std::numeric_limits<T>::is_integer, int>::type = 0>
+                          std::numeric_limits<T>::is_integer, int>::type = 0>
 std::vector<emp::block> RunOTSender(
     absl::Span<const emp::block> deltas,
     emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter>* ot) {
@@ -148,11 +148,12 @@ std::vector<emp::block> RunOTSender(
 
 // 1-out-of-2-OT for NTL modular integers.
 template <typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
+          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
 std::vector<emp::block> RunOTSender(
     absl::Span<const emp::block> deltas,
     emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter>* ot) {
-  // Generate random elements. Using NTL::random ensures that the elements are indeed sampled uniformly.
+  // Generate random elements. Using NTL::random ensures that the elements are
+  // indeed sampled uniformly.
   std::vector<emp::block> opt0(deltas.size());
   std::vector<emp::block> opt1(deltas.size());
   NTL::Vec<T> d, m, res;

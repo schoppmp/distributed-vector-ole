@@ -14,12 +14,18 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-workspace(name = "distributed_vector_ole")
-
-load("//distributed_vector_ole:preload.bzl", "distributed_vector_ole_preload")
-
-distributed_vector_ole_preload()
-
-load("//distributed_vector_ole:deps.bzl", "distributed_vector_ole_deps")
-
-distributed_vector_ole_deps()
+cc_binary(
+    name = "example",
+    srcs = [
+        "example.cpp",
+    ],
+    copts = [
+        "-fopenmp",
+        "-Wno-ignored-attributes",
+    ],
+    deps = [
+        "@distributed_vector_ole//distributed_vector_ole",
+        "@mpc_utils//mpc_utils:comm_channel",
+        "@mpc_utils//mpc_utils:config",
+    ],
+)

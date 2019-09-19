@@ -14,12 +14,21 @@
 #    You should have received a copy of the GNU Affero General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-workspace(name = "distributed_vector_ole")
+load(
+    "@bazel_tools//tools/build_defs/repo:http.bzl",
+    "http_archive",
+)
 
-load("//distributed_vector_ole:preload.bzl", "distributed_vector_ole_preload")
+http_archive(
+    name = "distributed_vector_ole",
+    strip_prefix = "distributed-vector-ole-master",
+    url = "https://github.com/schoppmp/distributed-vector-ole/archive/master.zip",
+)
+
+load("@distributed_vector_ole//distributed_vector_ole:preload.bzl", "distributed_vector_ole_preload")
 
 distributed_vector_ole_preload()
 
-load("//distributed_vector_ole:deps.bzl", "distributed_vector_ole_deps")
+load("@distributed_vector_ole//distributed_vector_ole:deps.bzl", "distributed_vector_ole_deps")
 
 distributed_vector_ole_deps()

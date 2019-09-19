@@ -97,7 +97,7 @@ def distributed_vector_ole_deps():
     if "com_github_google_benchmark" not in native.existing_rules():
         http_archive(
             name = "com_github_google_benchmark",
-            url = "https://github.com/google/benchmark/archive/df7c7ee1d37dda0fb597586b4624515166a778d0.zip",
-            sha256 = "7f41a125c859da0115f144fb228e9b0a9ba404aeca76e5ca51e0bfe250cc0bb5",
-            strip_prefix = "benchmark-df7c7ee1d37dda0fb597586b4624515166a778d0",
+            url = "https://github.com/google/benchmark/archive/bf4f2ea0bd1180b34718ac26eb79b170a4f6290e.zip",
+            sha256 = "e474a7f0112b9f2cd7e26ccd03c39d1c68114d3cad8f292021143b548fb00db7",
+            strip_prefix = "benchmark-bf4f2ea0bd1180b34718ac26eb79b170a4f6290e",
         )
