@@ -27,16 +27,16 @@ def distributed_vector_ole_preload():
     if "com_google_absl" not in native.existing_rules():
         http_archive(
             name = "com_google_absl",
-            urls = ["https://github.com/abseil/abseil-cpp/archive/7c7754fb3ed9ffb57d35fe8658f3ba4d73a31e72.zip"],  # 2019-03-14
-            strip_prefix = "abseil-cpp-7c7754fb3ed9ffb57d35fe8658f3ba4d73a31e72",
-            sha256 = "71d00d15fe6370220b6685552fb66e5814f4dd2e130f3836fc084c894943753f",
+            urls = ["https://github.com/abseil/abseil-cpp/archive/ccdd1d57b6386ebc26fb0c7d99b604672437c124.zip"],
+            strip_prefix = "abseil-cpp-ccdd1d57b6386ebc26fb0c7d99b604672437c124",
+            sha256 = "a463a791e1b5eaad461956495401357efb792fcdbf47b5737ec420bb54c804b6",
         )
     if "com_github_nelhage_rules_boost" not in native.existing_rules():
         http_archive(
             name = "com_github_nelhage_rules_boost",
-            url = "https://github.com/nelhage/rules_boost/archive/417642961150e987bc1ac78c7814c617566ffdaa.zip",
-            sha256 = "b24dd149c0cc9f7ff5689d91f99aaaea0d340baf9911439b573f02074148533a",
-            strip_prefix = "rules_boost-417642961150e987bc1ac78c7814c617566ffdaa",
+            url = "https://github.com/nelhage/rules_boost/archive/a1dd05e7e9178f8aad86e39f3a5b377902eae5b2.zip",
+            sha256 = "f9afc8e2d3ef2cca277767745af02666d139dd285d0b820d0ce92238a457bac4",
+            strip_prefix = "rules_boost-a1dd05e7e9178f8aad86e39f3a5b377902eae5b2",
         )
     if "com_github_schoppmp_rules_oblivc" not in native.existing_rules():
         http_archive(
@@ -48,9 +48,9 @@ def distributed_vector_ole_preload():
     if "rules_foreign_cc" not in native.existing_rules():
         http_archive(
             name = "rules_foreign_cc",
-            url = "https://github.com/bazelbuild/rules_foreign_cc/archive/8ccd83504b2221b670fc0b83d78fcee5642f4cb1.zip",
-            strip_prefix = "rules_foreign_cc-8ccd83504b2221b670fc0b83d78fcee5642f4cb1",
-            sha256 = "e5e8289b236bf57cfed2e76a20756ddff90fec7c8a4633e6a028e65899ecb6c7",
+            url = "https://github.com/bazelbuild/rules_foreign_cc/archive/16ddc00bd4e1b3daf3faee1605a168f5283326fa.zip",
+            strip_prefix = "rules_foreign_cc-16ddc00bd4e1b3daf3faee1605a168f5283326fa",
+            sha256 = "54ef1b6a31f7cd0f1c707efb1dc670ab86d2d7238af845108f31ed9e6d0fdf01",
         )
 
     # Transitive dependency of io_bazel_rules_docker
@@ -82,9 +82,9 @@ def distributed_vector_ole_preload():
     if "mpc_utils" not in native.existing_rules():
         http_archive(
             name = "mpc_utils",
-            url = "https://github.com/schoppmp/mpc-utils/archive/21bbab2ebb8d58871e25604e6c8f3180a7c73f41.zip",
-            sha256 = "65e2e991ae8a66472cc5b55182fb13d8a690ea6f6f55af01a88b2f0f96ec0918",
-            strip_prefix = "mpc-utils-21bbab2ebb8d58871e25604e6c8f3180a7c73f41",
+            url = "https://github.com/schoppmp/mpc-utils/archive/2022b8d8162e450434e72d036118af59abe74b02.zip",
+            sha256 = "a419392c9c5c0e12185929f84abf4f150936fa6437c9fe8c134bddfcd7a56e0b",
+            strip_prefix = "mpc-utils-2022b8d8162e450434e72d036118af59abe74b02",
         )
     if "io_bazel_rules_docker" not in native.existing_rules():
         http_archive(
