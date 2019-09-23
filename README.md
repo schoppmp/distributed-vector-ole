@@ -1,11 +1,26 @@
 # Distributed Vector-OLE
 
-A two-party generator for Vector-OLE correlations. The only dependency is [Bazel](https://bazel.build), all other dependencies will be built from source.
-To build and test, run
+A two-party generator for Vector-OLE correlations.
+To build, first install the required dependencies:
 ```
-$ bazel build ...
-$ bazel test ...
+# Arch Linux
+sudo pacman -Sy base-devel bazel git python python2 cmake boost
+
+# Ubuntu 18.10
+sudo apt-get install build-essential openjdk-11-jdk gnupg2 curl patch m4 cmake libboost-all-dev
+echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+sudo apt-get update && sudo apt-get install bazel
 ```
+Then, run
+```
+bazel build ...
+```
+to build, and 
+```
+bazel test ...
+```
+to test.
 To use this library in your own code, include it in your WORKSPACE file like this:
 ```
 load(
