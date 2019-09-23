@@ -1,1 +1,2 @@
 test --test_env HEAPCHECK=normal --test_env PPROF_PATH=external/mpc_utils/third_party/gperftools/gperftools/bin/pprof
+build --host_force_python=PY2

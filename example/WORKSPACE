@@ -19,11 +19,18 @@ load(
     "http_archive",
 )
 
-http_archive(
+# The local_repository only works when this is a subfolder of the distributed_vector_ole repository.
+local_repository(
     name = "distributed_vector_ole",
-    strip_prefix = "distributed-vector-ole-master",
-    url = "https://github.com/schoppmp/distributed-vector-ole/archive/master.zip",
+    path = "..",
 )
+
+## When using this example as a basis for your own workspace, replace the above by this http_archive instead:
+#http_archive(
+#    name = "distributed_vector_ole",
+#    strip_prefix = "distributed-vector-ole-master",
+#    url = "https://github.com/schoppmp/distributed-vector-ole/archive/master.zip",
+#)
 
 load("@distributed_vector_ole//distributed_vector_ole:preload.bzl", "distributed_vector_ole_preload")
 
