@@ -34,4 +34,4 @@ http_archive(
     url = "https://github.com/schoppmp/distributed-vector-ole/archive/master.zip",
 )
 ```
-An usage example can be found in the [example](example) folder.
+A usage example can be found in the [example](example) folder.
