@@ -28,6 +28,10 @@ load(
     container_repositories = "repositories",
 )
 load(
+    "@io_bazel_rules_docker//cc:image.bzl",
+    _cc_image_repos = "repositories",
+)
+load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_pull",
 )
@@ -62,42 +66,12 @@ def distributed_vector_ole_deps():
     mpc_utils_deps(enable_oblivc = False)
 
     container_repositories()
+    _cc_image_repos()
 
-    # Something needs a recend GlibC.
+    # Something needs a recent GlibC, which is not included in standard distroless images.
     container_pull(
-        name = "archlinux_base",
-        digest = "sha256:29ef3558fb2f91376782e46415299cf85618aad3d2859fb4ce342a63087bc6a3",
+        name = "distroless_base",
+        digest = "sha256:6d25761ba94c2b94db2dbea59390eaca65ff39596d64ec940d74140e1dc8872a",
         registry = "index.docker.io",
-        repository = "archlinux/base",
+        repository = "schoppmp/distroless-arch",
     )
-
-    if "org_gmplib" not in native.existing_rules():
-        http_archive(
-            name = "org_gmplib",
-            urls = [
-                "https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz",
-                "https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.xz",
-            ],
-            strip_prefix = "gmp-6.1.2",
-            build_file_content = all_content,
-            sha256 = "87b565e89a9a684fe4ebeeddb8399dce2599f9c9049854ca8c0dfbdea0e21912",
-        )
-
-    if "boringssl" not in native.existing_rules():
-        http_archive(
-            name = "boringssl",
-            sha256 = "1188e29000013ed6517168600fc35a010d58c5d321846d6a6dfee74e4c788b45",
-            strip_prefix = "boringssl-7f634429a04abc48e2eb041c81c5235816c96514",
-            urls = [
-                "https://mirror.bazel.build/github.com/google/boringssl/archive/7f634429a04abc48e2eb041c81c5235816c96514.tar.gz",
-                "https://github.com/google/boringssl/archive/7f634429a04abc48e2eb041c81c5235816c96514.tar.gz",
-            ],
-        )
-
-    if "com_github_google_benchmark" not in native.existing_rules():
-        http_archive(
-            name = "com_github_google_benchmark",
-            url = "https://github.com/google/benchmark/archive/bf4f2ea0bd1180b34718ac26eb79b170a4f6290e.zip",
-            sha256 = "e474a7f0112b9f2cd7e26ccd03c39d1c68114d3cad8f292021143b548fb00db7",
-            strip_prefix = "benchmark-bf4f2ea0bd1180b34718ac26eb79b170a4f6290e",
-        )

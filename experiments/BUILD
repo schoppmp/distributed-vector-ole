@@ -16,6 +16,8 @@
 
 load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle")
+load("@io_bazel_rules_docker//container:new_push.bzl", "new_container_push")
+load("//experiments:docker_deploy_tag_setting.bzl", "docker_deploy_tag_setting")
 
 DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
     "-fopenmp",
@@ -46,13 +48,28 @@ cc_binary(
 
 cc_image(
     name = "experiments_image",
-    base = "@archlinux_base//image",
+    base = "@distroless_base//image",
     binary = ":experiments",
 )
 
-container_bundle(
-    name = "deploy",
-    images = {
-        "gitlab.informatik.hu-berlin.de:4567/ti/research/distributed-vector-ole/experiments": ":experiments_image",
-    },
+# Rules for deploying to the HU registry
+docker_deploy_tag_setting(
+    name = "docker_deploy_tag",
+    build_setting_default = "test",
+)
+
+genrule(
+    name = "gen_docker_deploy_tag_file",
+    outs = ["docker_deploy_tag_file"],
+    cmd = "echo $(DOCKER_DEPLOY_TAG) > \"$@\"",
+    toolchains = [":docker_deploy_tag"]
+)
+
+new_container_push(
+    name = "deploy_hu",
+    format = "Docker",
+    registry = "gitlab.informatik.hu-berlin.de:4567",
+    repository = "ti/research/distributed-vector-ole/experiments",
+    image = ":experiments_image",
+    tag_file = "docker_deploy_tag_file"
 )
