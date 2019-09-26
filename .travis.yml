@@ -1,8 +1,15 @@
 language: cpp
-compiler: g++
-dist: bionic
+
+matrix:
+  include:
+    - os: linux
+      dist: bionic
+    - os: linux
+      dist: disco
+
 services:
   - docker
+
 cache:
   directories:
     - /home/travis/bazel-cache
