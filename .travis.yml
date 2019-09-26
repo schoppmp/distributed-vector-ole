@@ -1,6 +1,11 @@
 language: cpp
 compiler: g++
 dist: bionic
+services:
+  - docker
+cache:
+  directories:
+    - /home/travis/bazel-cache
 
 before_install:
   - sudo apt-get update
@@ -8,7 +13,11 @@ before_install:
   - echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
   - curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
   - sudo apt-get update && sudo apt-get install -y bazel
+  - docker pull buchgr/bazel-remote-cache
+  - mkdir -p /home/travis/bazel-cache && docker run -v /home/travis/bazel-cache:/data -p 9090:8080 buchgr/bazel-remote-cache --max_size=5
+  - echo "build --remote_http_cache=http://localhost:9090" >> ~/.bazelrc
+
 
 script:
-  - bazel build ...
-  - bazel test ...
+  - bazel build ... --show_progress_rate_limit 10
+  - bazel test ... --show_progress_rate_limit 10
