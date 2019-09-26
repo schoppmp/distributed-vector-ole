@@ -24,7 +24,9 @@ before_install:
   - docker run -d -v /home/travis/bazel-cache:/data -p 9090:8080 buchgr/bazel-remote-cache --max_size=5
   - echo "build --remote_http_cache=http://localhost:9090" >> ~/.bazelrc
 
-
 script:
   - bazel build ... --show_progress_rate_limit 10
   - bazel test ... --show_progress_rate_limit 10
+
+before_cache:
+  - sudo chown --recursive travis:travis /home/travis/bazel-cache
