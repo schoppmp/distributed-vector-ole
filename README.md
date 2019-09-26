@@ -1,4 +1,4 @@
-# Distributed Vector-OLE [![Build Status](https://travis-ci.org/schoppmp/distributed-vector-ole.svg?branch=master)](https://travis-ci.org/schoppmp/distributed-vector-ole)
+# Distributed Vector-OLE [![Build Status](https://travis-ci.com/schoppmp/distributed-vector-ole.svg?branch=master)](https://travis-ci.com/schoppmp/distributed-vector-ole)
 
 A two-party generator for Vector-OLE correlations.
 To build, first install the required dependencies:
