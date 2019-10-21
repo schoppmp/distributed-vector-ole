@@ -19,6 +19,7 @@ load(
     "http_archive",
 )
 load("@mpc_utils//mpc_utils:deps.bzl", "mpc_utils_deps")
+load("@mpc_utils//third_party:repo.bzl", "third_party_http_archive")
 load(
     "@rules_foreign_cc//:workspace_definitions.bzl",
     "rules_foreign_cc_dependencies",
@@ -56,12 +57,15 @@ def distributed_vector_ole_deps():
     # Load EMP-OT before mpc_utils_deps() because we need a patched version.
     # TODO(adria) merge this version upstream or put the patch in this repo.
     if "com_github_emp_toolkit_emp_ot" not in native.existing_rules():
-        http_archive(
+        third_party_http_archive(
             name = "com_github_emp_toolkit_emp_ot",
             url = "https://github.com/adriagascon/emp-ot/archive/90319da396e731d0b24e90e1ccaa3b76fa73f641.zip",
             sha256 = "8cc43964b0d1880429acf6dd972f1e080923c71d25127e74607f628b7cdc6c30",
             strip_prefix = "emp-ot-90319da396e731d0b24e90e1ccaa3b76fa73f641",
             build_file = clean_dep("@mpc_utils//third_party:emp_ot.BUILD"),
+            link_files = {
+                clean_dep("@mpc_utils//third_party/emp-tool:FindBoost.cmake"): "cmake/FindBoost.cmake",
+            },
         )
     mpc_utils_deps(enable_oblivc = False)
 
