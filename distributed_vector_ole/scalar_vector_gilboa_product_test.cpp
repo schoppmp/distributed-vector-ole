@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
+#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
@@ -52,12 +53,12 @@ class ScalarVectorGilboaProductTest : public ::testing::Test {
     T x(-42);
     std::vector<T> result(size);
     for (int i = 0; i < size; ++i) {
-      v[i] = i;
+      v[i] = T(i);
       result[i] = x * v[i];
     }
     std::vector<T> output_0;
     std::vector<T> output_1;
-    // TODO: Implement a NTLContext<T> template to choose the correct context.
+
     NTLContext<T> ntl_context;
     ntl_context.save();
     std::thread thread1(
@@ -84,7 +85,7 @@ class ScalarVectorGilboaProductTest : public ::testing::Test {
 };
 
 using MyTypes = ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t,
-                                 absl::uint128, NTL::ZZ_p, NTL::zz_p>;
+                                 absl::uint128, gf128, NTL::ZZ_p, NTL::zz_p>;
 TYPED_TEST_SUITE(ScalarVectorGilboaProductTest, MyTypes);
 
 TYPED_TEST(ScalarVectorGilboaProductTest, TestSmallVectors) {

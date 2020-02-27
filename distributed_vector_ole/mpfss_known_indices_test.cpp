@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/mpfss_known_indices.h"
+#include "distributed_vector_ole/gf128.h"
 #include "NTL/ZZ_p.h"
 #include "absl/container/flat_hash_map.h"
 #include "gtest/gtest.h"
@@ -73,7 +74,7 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
       if (nonzero_map.contains(i)) {
         EXPECT_EQ(sum, nonzero_map[i]);
       } else {
-        EXPECT_EQ(sum, 0);
+        EXPECT_EQ(sum, T(0));
       }
     }
   }
@@ -84,7 +85,7 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
 };
 
 using MPFSSKnownIndicesTypes =
-    ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t, absl::uint128,
+    ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t, absl::uint128, gf128,
                      NTL::ZZ_p, NTL::zz_p>;
 TYPED_TEST_SUITE(MPFSSKnownIndicesTest, MPFSSKnownIndicesTypes);
 

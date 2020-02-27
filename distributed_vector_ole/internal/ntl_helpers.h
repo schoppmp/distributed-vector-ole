@@ -26,7 +26,6 @@
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
 #include "absl/meta/type_traits.h"
-#include "absl/numeric/int128.h"
 
 namespace distributed_vector_ole {
 
@@ -68,46 +67,6 @@ inline int NTLNumBits<NTL::ZZ_p>() {
 // allocations.
 template <typename T>
 T* NTLTemp();
-
-// Conversions between absl::uint128 and various types.
-template <typename T, typename std::enable_if<
-    std::numeric_limits<T>::is_integer, int>::type = 0>
-absl::uint128 ToUint128(const T& x) {
-  return x;
-}
-template <typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-absl::uint128 ToUint128(const T& x) {
-  uint64_t low = NTL::conv<uint64_t>(NTL::rep(x));
-  uint64_t high = NTL::conv<uint64_t>(NTL::rep(x) >> 64);
-  return absl::MakeUint128(high, low);
-}
-template<>
-inline absl::uint128 ToUint128(const NTL::zz_p& x) {
-  return NTL::conv<uint64_t>(NTL::rep(x));
-}
-
-template <typename T>
-void FromUint128(absl::uint128 x, T* out) {
-  *out = T(x);
-}
-template <>
-inline void FromUint128<NTL::zz_p>(absl::uint128 x, NTL::zz_p *out) {
-  if (NTLNumBits<NTL::zz_p>() < 128) {
-    x &= ((absl::uint128(1) << NTLNumBits<NTL::zz_p>()) - 1);
-  }
-  NTL::conv(*out, absl::Uint128Low64(x));
-}
-template<>
-inline void FromUint128(absl::uint128 x, NTL::ZZ_p* out) {
-  if (NTLNumBits<NTL::ZZ_p>() < 128) {
-    x &= ((absl::uint128(1) << NTLNumBits<NTL::ZZ_p>()) - 1);
-  }
-  NTL::conv(*NTLTemp<NTL::ZZ>(), absl::Uint128High64(x));
-  *NTLTemp<NTL::ZZ>() <<= 64;
-  *NTLTemp<NTL::ZZ>() |= NTL::conv<NTL::ZZ>(absl::Uint128Low64(x));
-  NTL::conv(*out, *NTLTemp<NTL::ZZ>());
-}
 
 }  // namespace distributed_vector_ole
 

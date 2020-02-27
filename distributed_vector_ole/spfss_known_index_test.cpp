@@ -16,6 +16,7 @@
 
 #include "distributed_vector_ole/spfss_known_index.h"
 #include "distributed_vector_ole/internal/ntl_helpers.h"
+#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include <vector>
 #include "absl/memory/memory.h"
@@ -74,7 +75,7 @@ class SPFSSKnownIndexTest : public ::testing::Test {
       T sum = output_0[i];
       sum += output_1[i];
       if (i != index) {
-        EXPECT_EQ(sum, 0);
+        EXPECT_EQ(sum, T(0));
       } else {
         EXPECT_EQ(sum, val);
       }
@@ -87,7 +88,7 @@ class SPFSSKnownIndexTest : public ::testing::Test {
 };
 
 using MyTypes = ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t,
-                                 absl::uint128, NTL::ZZ_p, NTL::zz_p>;
+                                 absl::uint128, gf128, NTL::ZZ_p, NTL::zz_p>;
 TYPED_TEST_SUITE(SPFSSKnownIndexTest, MyTypes);
 
 TYPED_TEST(SPFSSKnownIndexTest, TestSmallVectors) {

@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/distributed_vector_ole.h"
+#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include "absl/memory/memory.h"
 #include "gtest/gtest.h"
@@ -61,7 +62,7 @@ class DistributedVectorOLETest : public ::testing::Test {
 };
 
 using MyTypes = ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t,
-                                 absl::uint128, NTL::ZZ_p>;
+                                 absl::uint128, gf128, NTL::ZZ_p>;
 TYPED_TEST_SUITE(DistributedVectorOLETest, MyTypes);
 
 TYPED_TEST(DistributedVectorOLETest, TestSmallVectors) {

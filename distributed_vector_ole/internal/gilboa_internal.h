@@ -28,43 +28,54 @@
 #include "absl/types/span.h"
 #include "boost/container/vector.hpp"
 #include "distributed_vector_ole/internal/ntl_helpers.h"
+#include "distributed_vector_ole/internal/scalar_type_helpers.h"
+#include "distributed_vector_ole/gf128.h"
 #include "emp-ot/emp-ot.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/comm_channel_emp_adapter.hpp"
 #include "openssl/rand.h"
 
 namespace distributed_vector_ole {
-
 namespace gilboa_internal {
 
 // Returns the size (in bytes) of the type parameter or the argument.
-template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
+template<typename T, typename std::enable_if<
+    std::numeric_limits<T>::is_integer, int>::type = 0>
 constexpr int SizeOf() {
   return sizeof(T);
 }
-template <typename T,
-          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
+template<typename T, typename std::enable_if<
+    std::is_same<T, gf128>::value, int>::type = 0>
+constexpr int SizeOf() {
+  return sizeof(T);
+}
+template<typename T,
+    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
 int SizeOf() {
   int num_bits = NTLNumBits<T>();
   return (num_bits + 7) / 8;
 }
 
 // Returns the k-th bit of x.
-template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
+template<typename T, typename std::enable_if<
+    std::numeric_limits<T>::is_integer, int>::type = 0>
 bool GetBit(T x, int k) {
   return ((x >> k) & T(1)) != 0 ? true : false;
 }
-template <typename T,
-          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-bool GetBit(const T& x, int k) {
+template<typename T, typename std::enable_if<
+    std::is_same<T, gf128>::value, int>::type = 0>
+bool GetBit(T x, int k) {
+  return GetBit(ToUint128(x), k);
+}
+template<typename T,
+    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
+bool GetBit(const T &x, int k) {
   return NTL::bit(NTL::rep(x), k);
 }
 
 // Returns the bit decomposition of a type T value
-template <typename T>
-boost::container::vector<bool> GetBits(const T& x) {
+template<typename T>
+boost::container::vector<bool> GetBits(const T &x) {
   boost::container::vector<bool> out(SizeOf<T>() * 8);
   for (int i = 0; i < static_cast<int>(out.size()); ++i) {
     out[i] = GetBit(x, i);
@@ -73,13 +84,18 @@ boost::container::vector<bool> GetBits(const T& x) {
 }
 
 // Returns the j-th power of T(2).
-template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
+template<typename T, typename std::enable_if<
+    std::numeric_limits<T>::is_integer, int>::type = 0>
 T PowerOf2(int j) {
   return T(1) << j;
 }
-template <typename T,
-          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
+template<typename T, typename std::enable_if<
+    std::is_same<T, gf128>::value, int>::type = 0>
+T PowerOf2(int j) {
+  return T(absl::uint128(1) << j);
+}
+template<typename T,
+    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
 T PowerOf2(int j) {
   return NTL::conv<T>(typename T::rep_type(1) << j);
 }
@@ -87,8 +103,8 @@ T PowerOf2(int j) {
 // Conversion functions between EMP and Span<T>
 // These assume that the total size of the span is 128 bits,
 // and thus matches the size of an EMP block
-template <typename T>
-emp::block SpanToEMPBlock(absl::Span<const T> v, const T& multiplier = T(1)) {
+template<typename T>
+emp::block SpanToEMPBlock(absl::Span<const T> v, const T &multiplier = T(1)) {
   absl::uint128 packed = 0;
   T temp;  // Saves an allocation.
   for (int i = v.size() - 1; i >= 0; --i) {
@@ -104,7 +120,7 @@ emp::block SpanToEMPBlock(absl::Span<const T> v, const T& multiplier = T(1)) {
   return emp::makeBlock(high, low);
 }
 
-template <typename T>
+template<typename T>
 void EMPBlockToSpan(emp::block b, absl::Span<T> out) {
   int packing_factor = 16 / SizeOf<T>();  // emp::block are 128 bits
   assert(packing_factor == static_cast<int>(out.size()));
@@ -114,7 +130,7 @@ void EMPBlockToSpan(emp::block b, absl::Span<T> out) {
   }
 }
 
-template <typename T>
+template<typename T>
 vector<T> EMPBlockToVector(emp::block b) {
   int packing_factor = 16 / SizeOf<T>();  // emp::block are 128 bits
   std::vector<T> out(packing_factor);
@@ -123,11 +139,13 @@ vector<T> EMPBlockToVector(emp::block b) {
 }
 
 // Correlated OT for integers modulo 2^b.
-template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
+template<typename T, typename boost::enable_if_c<
+        std::numeric_limits<T>::is_integer ||
+        std::is_same<T, gf128>::value
+    , int>::type = 0>
 std::vector<emp::block> RunOTSender(
     absl::Span<const emp::block> deltas,
-    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter>* ot) {
+    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
   std::vector<emp::block> opt0(deltas.size());
   NTL::Vec<T> d, m, res;
   int packing_factor = 16 / SizeOf<T>();
@@ -147,11 +165,11 @@ std::vector<emp::block> RunOTSender(
 }
 
 // 1-out-of-2-OT for NTL modular integers.
-template <typename T,
-          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
+template<typename T,
+    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
 std::vector<emp::block> RunOTSender(
     absl::Span<const emp::block> deltas,
-    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter>* ot) {
+    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
   // Generate random elements. Using NTL::random ensures that the elements are
   // indeed sampled uniformly.
   std::vector<emp::block> opt0(deltas.size());
@@ -178,10 +196,10 @@ std::vector<emp::block> RunOTSender(
   return opt0;
 }
 
-template <typename T>
+template<typename T>
 inline std::vector<emp::block> RunOTReceiver(
     absl::Span<const bool> choices,
-    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter>* ot) {
+    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
   std::vector<emp::block> result(choices.size());
   bool use_correlated_ot = !is_modular_integer<T>::value;
   if (use_correlated_ot) {

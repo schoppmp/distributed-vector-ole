@@ -16,6 +16,7 @@
 
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/mpfss_known_indices.h"
+#include "distributed_vector_ole/gf128.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
@@ -70,7 +71,7 @@ static void BM_RunNative(benchmark::State &state) {
   auto mpfss0 = MPFSSKnownIndices::Create(chan0).ValueOrDie();
   std::vector<T> output0(length);
   std::vector<T> y(GetNumIndicesForLength(length));
-  std::iota(y.begin(), y.end(), T(42));
+  std::fill(y.begin(), y.end(), T(42));
   std::vector<int64_t> indices(GetNumIndicesForLength(length));
   std::iota(indices.begin(), indices.end(), 0);
   mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
@@ -136,6 +137,9 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, false)
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
 
 // Timing (NTL).
 BENCHMARK_TEMPLATE(BM_RunNTL, 8, false)
@@ -168,6 +172,9 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 

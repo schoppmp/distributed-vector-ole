@@ -172,6 +172,13 @@ void DistributedVectorOLE<NTL::ZZ_p>::Randomize(absl::Span<NTL::ZZ_p> output) {
     output[i] = std::move(ntl_vec[i]);
   }
 }
+template <>
+void DistributedVectorOLE<NTL::zz_p>::Randomize(absl::Span<NTL::zz_p> output) {
+  NTL::Vec<NTL::zz_p> ntl_vec = NTL::random_vec_zz_p(output.size());
+  for (int64_t i = 0; i < static_cast<int64_t>(output.size()); i++) {
+    output[i] = ntl_vec[i];
+  }
+}
 
 template <typename T>
 mpc_utils::Status DistributedVectorOLE<T>::Precompute(int64_t size) {

@@ -24,6 +24,7 @@
 #include <vector>
 #include "NTL/ZZ_p.h"
 #include "distributed_vector_ole/ggm_tree.h"
+#include "distributed_vector_ole/gf128.h"
 #include "distributed_vector_ole/internal/all_but_one_random_ot_internal.h"
 #include "emp-ot/emp-ot.h"
 #include "mpc_utils/benchmarker.hpp"
@@ -90,13 +91,17 @@ class AllButOneRandomOT {
 
   // Checks if the tree should be accepted to ensure equal probability of each
   // leaf value. Called by `SendTree`.
+  // GF128 elements.
+  template<typename T, typename std::enable_if<
+      std::is_same<T, gf128>::value, int>::type = 0>
+  bool AcceptTree(const GGMTree& tree) { return true; }
+  // Integral types.
   template <typename T, typename std::enable_if<
-                            std::numeric_limits<T>::is_integer, int>::type = 0>
-  bool AcceptTree(const GGMTree& tree) {
-    return true;
-  }
-  template <typename T, typename std::enable_if<is_modular_integer<T>::value,
-                                                int>::type = 0>
+      std::numeric_limits<T>::is_integer, int>::type = 0>
+  bool AcceptTree(const GGMTree& tree) { return true; }
+  // NTL modular integers. Implemented below.
+  template <typename T,
+      typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
   bool AcceptTree(const GGMTree& tree);
 
   // Obliviously receives a GGMTree that is equal to the server's except at
@@ -145,6 +150,9 @@ mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::SendTree(
   return tree;
 }
 
+// Template specializations for AcceptTree.
+
+// NTL modular integers.
 template <typename T,
           typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
 bool AllButOneRandomOT::AcceptTree(const GGMTree& tree) {

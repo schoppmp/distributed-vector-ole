@@ -38,10 +38,11 @@
 #include "mpc_utils/status_macros.h"
 #include "mpc_utils/statusor.h"
 
-// OpenMP custom reductions for NTL::ZZ_p and absl::uint128
+// OpenMP custom reductions for non-integer types.
 #pragma omp declare reduction(+: NTL::ZZ_p: omp_out += omp_in) initializer (omp_priv = NTL::ZZ_p(0))
 #pragma omp declare reduction(+: NTL::zz_p: omp_out += omp_in) initializer (omp_priv = NTL::zz_p(0))
 #pragma omp declare reduction(+: absl::uint128: omp_out += omp_in) initializer (omp_priv = 0)
+#pragma omp declare reduction(+: distributed_vector_ole::gf128: omp_out += omp_in) initializer (omp_priv = distributed_vector_ole::gf128(0))
 
 namespace distributed_vector_ole {
 
@@ -53,13 +54,13 @@ class SPFSSKnownIndex {
   // Creates an instance of SPFSSKnownIndex that communicates over the given
   // comm_channel. This corresponds to an instance of AllButOneRandomOT.
   static mpc_utils::StatusOr<std::unique_ptr<SPFSSKnownIndex>> Create(
-      mpc_utils::comm_channel* channel);
+      mpc_utils::comm_channel *channel);
 
   // Runs the ValueProvider side of the protocol. `output` must point to an
   // array of pre-allocated Ts.
-  template <typename T>
+  template<typename T>
   mpc_utils::Status RunValueProvider(T val_share, absl::Span<T> output);
-  template <typename T>
+  template<typename T>
   mpc_utils::StatusOr<std::vector<T>> RunValueProvider(T val_share,
                                                        int64_t size) {
     std::vector<T> output(size);
@@ -70,10 +71,10 @@ class SPFSSKnownIndex {
   // Runs the IndexProvider side of the protocol. `output` must point to an
   // array of pre-allocated Ts, and `ìndex` must be between 0 and output.size()
   // - 1.
-  template <typename T>
+  template<typename T>
   mpc_utils::Status RunIndexProvider(T val_share, int64_t index,
                                      absl::Span<T> output);
-  template <typename T>
+  template<typename T>
   mpc_utils::StatusOr<std::vector<T>> RunIndexProvider(T val_share,
                                                        int64_t index,
                                                        int64_t size) {
@@ -84,14 +85,14 @@ class SPFSSKnownIndex {
   }
 
  private:
-  SPFSSKnownIndex(mpc_utils::comm_channel* channel,
+  SPFSSKnownIndex(mpc_utils::comm_channel *channel,
                   std::unique_ptr<AllButOneRandomOT> all_but_one_rot);
 
-  mpc_utils::comm_channel* channel_;
+  mpc_utils::comm_channel *channel_;
   std::unique_ptr<AllButOneRandomOT> all_but_one_rot_;
 };
 
-template <typename T>
+template<typename T>
 mpc_utils::Status SPFSSKnownIndex::RunValueProvider(T val_share,
                                                     absl::Span<T> output) {
   RETURN_IF_ERROR(all_but_one_rot_->RunSender(output));
@@ -116,7 +117,7 @@ mpc_utils::Status SPFSSKnownIndex::RunValueProvider(T val_share,
   return mpc_utils::OkStatus();
 }
 
-template <typename T>
+template<typename T>
 mpc_utils::Status SPFSSKnownIndex::RunIndexProvider(T val_share, int64_t index,
                                                     absl::Span<T> output) {
   RETURN_IF_ERROR(all_but_one_rot_->RunReceiver(index, output));
@@ -135,7 +136,7 @@ mpc_utils::Status SPFSSKnownIndex::RunIndexProvider(T val_share, int64_t index,
   }
   try {
     channel_->recv(sum_server);
-  } catch (boost::exception& ex) {
+  } catch (boost::exception &ex) {
     std::cerr << boost::diagnostic_information(ex);
     throw;
   }
