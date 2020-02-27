@@ -17,6 +17,7 @@
 #include "NTL/ZZ_p.h"
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
+#include "distributed_vector_ole/gf128.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
@@ -48,7 +49,7 @@ void BM_RunNative(benchmark::State &state) {
 
   auto gilboa0 = ScalarVectorGilboaProduct::Create(chan0).ValueOrDie();
   std::vector<T> y(length);
-  std::iota(y.begin(), y.end(), T(0));
+  std::fill(y.begin(), y.end(), T(23));
   std::vector<T> output0 = gilboa0->RunVectorProvider<T>(y).ValueOrDie();
   for (auto _ : state) {
     chan0->send(true);
@@ -117,6 +118,9 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, false)
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, false)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
 
 // Timing (ZZ_p).
 BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 8, false)
@@ -166,6 +170,9 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, true)
     ->RangeMultiplier(4)
     ->Range(1 << 12, 1 << 22);
 

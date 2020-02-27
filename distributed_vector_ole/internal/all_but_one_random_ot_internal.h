@@ -24,6 +24,8 @@
 #include "absl/types/span.h"
 #include "distributed_vector_ole/ggm_tree.h"
 #include "distributed_vector_ole/internal/ntl_helpers.h"
+#include "distributed_vector_ole/internal/scalar_type_helpers.h"
+#include "distributed_vector_ole/gf128.h"
 #include "emp-ot/emp-ot.h"
 
 namespace distributed_vector_ole {
@@ -37,7 +39,7 @@ namespace all_but_one_random_ot_internal {
 //   represents multiple values of type T if sizeof(T) < sizeof(GGMTree::Block).
 //   This will require an (n-1)-out-of-n-OT on the last level.
 template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
+    std::numeric_limits<T>::is_integer, int>::type = 0>
 void UnpackLastLevel(const GGMTree& tree, absl::Span<T> output) {
 #pragma omp parallel for schedule(static)
   for (int64_t i = 0; i < tree.num_leaves(); ++i) {
@@ -46,6 +48,19 @@ void UnpackLastLevel(const GGMTree& tree, absl::Span<T> output) {
     output[i] = T(leaf);
   }
 }
+
+// Version for GF128.
+template<typename T, typename std::enable_if<
+    std::is_same<T, gf128>::value, int>::type = 0>
+void UnpackLastLevel(const GGMTree& tree, absl::Span<T> output) {
+#pragma omp parallel for schedule(static)
+  for (int64_t i = 0; i < tree.num_leaves(); ++i) {
+    // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
+    GGMTree::Block leaf = tree.GetValueAtLeaf(i).ValueOrDie();
+    output[i] = T(Uint128High64(leaf), Uint128Low64(leaf));
+  }
+}
+
 
 // Version for NTL modular integers.
 template <typename T,

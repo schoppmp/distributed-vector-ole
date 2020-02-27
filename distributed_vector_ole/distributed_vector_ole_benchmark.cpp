@@ -16,6 +16,7 @@
 
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/distributed_vector_ole.h"
+#include "distributed_vector_ole/gf128.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
@@ -114,8 +115,11 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, false)
 ->RangeMultiplier(4)
 ->Range(1 << 12, 1 << 22);
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, false)
-->RangeMultiplier(4)
-->Range(1 << 12, 1 << 22);
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, false)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
 
 // Timing (ZZ_p).
 BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 8, false)
@@ -165,8 +169,11 @@ BENCHMARK_TEMPLATE(BM_RunNative, uint64_t, true)
 ->RangeMultiplier(4)
 ->Range(1 << 12, 1 << 22);
 BENCHMARK_TEMPLATE(BM_RunNative, absl::uint128, true)
-->RangeMultiplier(4)
-->Range(1 << 12, 1 << 22);
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
+BENCHMARK_TEMPLATE(BM_RunNative, gf128, true)
+    ->RangeMultiplier(4)
+    ->Range(1 << 12, 1 << 22);
 
 // Communication (ZZ_p).
 BENCHMARK_TEMPLATE(BM_RunNTL, NTL::ZZ_p, 8, true)

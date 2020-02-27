@@ -73,8 +73,10 @@ cc_library(
         "internal/all_but_one_random_ot_internal.h",
     ],
     deps = [
+        ":gf128",
         ":ggm_tree",
         ":ntl_helpers",
+        ":scalar_type_helpers",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/types:span",
@@ -96,6 +98,7 @@ cc_library(
     ],
     deps = [
         ":all_but_one_random_ot_internal",
+        ":gf128",
         ":ggm_tree",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_google_absl//absl/types:span",
@@ -159,6 +162,7 @@ cc_test(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":ntl_helpers",
         ":spfss_known_index",
         "@com_google_absl//absl/memory",
@@ -178,6 +182,7 @@ cc_binary(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":ntl_helpers",
         ":spfss_known_index",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
@@ -267,6 +272,7 @@ cc_test(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":mpfss_known_indices",
         "@com_google_absl//absl/container:flat_hash_map",
         "@googletest//:gtest_main",
@@ -284,6 +290,7 @@ cc_binary(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":mpfss_known_indices",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_github_google_benchmark//:benchmark_main",
@@ -304,8 +311,20 @@ cc_library(
     visibility = ["//visibility:private"],
     deps = [
         "@com_google_absl//absl/meta:type_traits",
-        "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/types:optional",
+        "@mpc_utils//third_party/ntl",
+    ],
+)
+
+cc_library(
+    name = "scalar_type_helpers",
+    hdrs = [
+        "internal/scalar_type_helpers.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":gf128",
+        "@com_google_absl//absl/numeric:int128",
         "@mpc_utils//third_party/ntl",
     ],
 )
@@ -318,7 +337,9 @@ cc_library(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     visibility = ["//visibility:private"],
     deps = [
+        ":gf128",
         ":ntl_helpers",
+        ":scalar_type_helpers",
         "@boringssl//:crypto",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_google_absl//absl/numeric:int128",
@@ -356,6 +377,7 @@ cc_test(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":scalar_vector_gilboa_product",
         "@com_google_absl//absl/memory",
         "@googletest//:gtest_main",
@@ -375,6 +397,7 @@ cc_binary(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":gf128",
         ":scalar_vector_gilboa_product",
         "@com_github_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
@@ -405,6 +428,7 @@ cc_test(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":distributed_vector_ole",
+        ":gf128",
         "@com_google_absl//absl/memory",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
@@ -424,8 +448,27 @@ cc_binary(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":distributed_vector_ole",
+        ":gf128",
         "@com_github_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
+    ],
+)
+
+cc_library(
+    name = "gf128",
+    srcs = [
+        "gf128.cpp",
+    ],
+    hdrs = [
+        "gf128.h",
+    ],
+    local_defines = [
+        "USE_ASM",
+    ],
+    deps = [
+        "@boost//:serialization",
+        "@boringssl//:crypto",
+        "@com_google_absl//absl/numeric:int128",
     ],
 )
