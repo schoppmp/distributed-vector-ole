@@ -7,7 +7,7 @@ build_archlinux:
   tags:
     - aes  # Needed for running tests.
   before_script:
-    - pacman -Syu --noconfirm base-devel bazel git python python2 cmake boost
+    - pacman -Syu --noconfirm base-devel bazel git python python2 cmake
     - echo "build --remote_http_cache=https://${CACHE_USER}:${CACHE_PASSWORD}@bazel-remote-cache.informatik.hu-berlin.de:9090" >> ~/.bazelrc
   script:
     - bazel build ...
@@ -26,7 +26,7 @@ build_ubuntu:
     - aes  # Needed for running tests.
   before_script:
     - apt-get update
-    - apt-get install -y build-essential python python3 git openjdk-11-jdk gnupg2 curl patch m4 cmake libboost-system-dev
+    - apt-get install -y build-essential python python3 git gnupg2 curl patch m4 cmake
     - echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
     - curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
     - apt-get update && apt-get install -y bazel
@@ -45,7 +45,7 @@ deploy:
   image: archlinux/base
   stage: deploy
   before_script:
-    - pacman -Syu --noconfirm base-devel bazel git python python2 cmake boost docker
+    - pacman -Syu --noconfirm base-devel bazel git python python2 cmake docker
     - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $REGISTRY
     - echo "build --remote_http_cache=https://${CACHE_USER}:${CACHE_PASSWORD}@bazel-remote-cache.informatik.hu-berlin.de:9090" >> ~/.bazelrc
   script:

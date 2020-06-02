@@ -62,7 +62,7 @@ cc_binary(
     ],
     deps = [
         ":ggm_tree",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//third_party/gperftools",
     ],
 )
@@ -186,7 +186,7 @@ cc_binary(
         ":ntl_helpers",
         ":spfss_known_index",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
     ],
@@ -241,7 +241,7 @@ cc_binary(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
         ":cuckoo_hasher",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//third_party/gperftools",
     ],
 )
@@ -293,7 +293,7 @@ cc_binary(
         ":gf128",
         ":mpfss_known_indices",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
     ],
@@ -399,7 +399,7 @@ cc_binary(
     deps = [
         ":gf128",
         ":scalar_vector_gilboa_product",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
     ],
@@ -449,7 +449,7 @@ cc_binary(
     deps = [
         ":distributed_vector_ole",
         ":gf128",
-        "@com_github_google_benchmark//:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
         "@mpc_utils//mpc_utils/testing:comm_channel_test_helper",
         "@mpc_utils//third_party/gperftools",
     ],
