@@ -15,9 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/distributed_vector_ole.h"
-#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include "absl/memory/memory.h"
+#include "distributed_vector_ole/gf128.h"
 #include "gtest/gtest.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_matchers.h"
@@ -35,9 +35,9 @@ class DistributedVectorOLETest : public ::testing::Test {
     comm_channel *chan0 = helper_.GetChannel(0);
     comm_channel *chan1 = helper_.GetChannel(1);
     std::thread thread1([this, chan1] {
-      ASSERT_OK_AND_ASSIGN(vole_0_, DistributedVectorOLE<T>::Create(chan1));
+      ASSERT_OK_AND_ASSIGN(vole_1_, DistributedVectorOLE<T>::Create(chan1));
     });
-    ASSERT_OK_AND_ASSIGN(vole_1_, DistributedVectorOLE<T>::Create(chan0));
+    ASSERT_OK_AND_ASSIGN(vole_0_, DistributedVectorOLE<T>::Create(chan0));
     thread1.join();
   }
 
@@ -69,26 +69,26 @@ TYPED_TEST(DistributedVectorOLETest, TestSmallVectors) {
   for (int size = 1; size < 20; size += 4) {
     if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
       for (const auto &modulus : {
-          "340282366920938463463374607431768211456",  // 2^128 (the largest
-                                                      // modulus we
-                                                      // support)
-          // Prime moduli:
-          "340282366920938463463374607431768211297",  // 2^128 - 159
-          "18446744073709551557",                     // 2^64 - 59
-          "4294967291",                               // 2^32 - 5
-          "65521",                                    // 2^16 - 15
-          "251"                                       // 2^8 - 5
-      }) {
+               "340282366920938463463374607431768211456",  // 2^128 (the largest
+                                                           // modulus we
+                                                           // support)
+               // Prime moduli:
+               "340282366920938463463374607431768211297",  // 2^128 - 159
+               "18446744073709551557",                     // 2^64 - 59
+               "4294967291",                               // 2^32 - 5
+               "65521",                                    // 2^16 - 15
+               "251"                                       // 2^8 - 5
+           }) {
         NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
         this->TestVector(size);
       }
     } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
       for (int64_t modulus : {
-          1125899906842597L,  // 2^50 - 27
-          4294967291L,        // 2^32 - 5
-          65521L,             // 2^16 - 15
-          251L                // 2^8 - 5
-      }) {
+               1125899906842597L,  // 2^50 - 27
+               4294967291L,        // 2^32 - 5
+               65521L,             // 2^16 - 15
+               251L                // 2^8 - 5
+           }) {
         NTL::zz_p::init(modulus);
         this->TestVector(size);
       }

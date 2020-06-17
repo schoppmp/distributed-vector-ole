@@ -15,9 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/mpfss_known_indices.h"
-#include "distributed_vector_ole/gf128.h"
 #include "NTL/ZZ_p.h"
 #include "absl/container/flat_hash_map.h"
+#include "distributed_vector_ole/gf128.h"
 #include "gtest/gtest.h"
 #include "mpc_utils/status_matchers.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
@@ -42,18 +42,51 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
     thread1.join();
   }
 
-  void TestVectorOLE(int len) {
+  void TestAllModuliVectorOLE(int size, int num_indices) {
+    if (std::is_same<T, NTL::ZZ_p>::value) {
+      for (const auto &modulus : {
+               "340282366920938463463374607431768211456",  // 2^128 (the largest
+               // modulus we
+               // support)
+               // Prime moduli:
+               "340282366920938463463374607431768211297",  // 2^128 - 159
+               "18446744073709551557",                     // 2^64 - 59
+               "4294967291",                               // 2^32 - 5
+               "65521",                                    // 2^16 - 15
+               "251"                                       // 2^8 - 5
+           }) {
+        NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
+        this->TestVectorOLE(size, num_indices);
+      }
+    } else if (std::is_same<T, NTL::zz_p>::value) {
+      for (int64_t modulus : {
+               1125899906842597L,  // 2^50 - 27
+               4294967291L,        // 2^32 - 5
+               65521L,             // 2^16 - 15
+               251L                // 2^8 - 5
+           }) {
+        NTL::zz_p::init(modulus);
+        this->TestVectorOLE(size, num_indices);
+      }
+    } else {
+      this->TestVectorOLE(size, num_indices);
+    }
+  }
+
+  void TestVectorOLE(int size, int num_indices) {
     T x(2);
-    std::vector<T> y({T(42)});
-    std::vector<int64_t> indices = {0};
-    std::vector<T> output_0(len), output_1(len);
+    std::vector<T> y(num_indices);
+    std::fill(y.begin(), y.end(), T(23));
+    std::vector<int64_t> indices(num_indices);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::vector<T> output_0(size), output_1(size);
 
     // Run protocol.
     NTLContext<T> ntl_context;
     ntl_context.save();
     std::thread thread1([this, &output_1, &y, &indices, &ntl_context] {
       ntl_context.restore();
-      EXPECT_TRUE(mpfss_known_indices_1_
+      ASSERT_TRUE(mpfss_known_indices_1_
                       ->RunIndexProviderVectorOLE<T>(y, indices,
                                                      absl::MakeSpan(output_1))
                       .ok());
@@ -69,7 +102,7 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
     for (int i = 0; i < static_cast<int>(y.size()); i++) {
       nonzero_map[indices[i]] = x * y[i];
     }
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < size; i++) {
       T sum = output_0[i] + output_1[i];
       if (nonzero_map.contains(i)) {
         EXPECT_EQ(sum, nonzero_map[i]);
@@ -85,40 +118,21 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
 };
 
 using MPFSSKnownIndicesTypes =
-    ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t, absl::uint128, gf128,
-                     NTL::ZZ_p, NTL::zz_p>;
+    ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t, absl::uint128,
+                     gf128, NTL::ZZ_p, NTL::zz_p>;
 TYPED_TEST_SUITE(MPFSSKnownIndicesTest, MPFSSKnownIndicesTypes);
 
-TYPED_TEST(MPFSSKnownIndicesTest, TestVectorOLE) {
-  for (int size = 1; size < 50; size+=10) {
-    if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
-      for (const auto &modulus : {
-          "340282366920938463463374607431768211456",  // 2^128 (the largest
-                                                      // modulus we
-                                                      // support)
-          // Prime moduli:
-          "340282366920938463463374607431768211297",  // 2^128 - 159
-          "18446744073709551557",                     // 2^64 - 59
-          "4294967291",                               // 2^32 - 5
-          "65521",                                    // 2^16 - 15
-          "251"                                       // 2^8 - 5
-      }) {
-        NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
-        this->TestVectorOLE(size);
-      }
-    } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
-      for (int64_t modulus : {
-          1125899906842597L,  // 2^50 - 27
-          4294967291L,        // 2^32 - 5
-          65521L,             // 2^16 - 15
-          251L                // 2^8 - 5
-      }) {
-        NTL::zz_p::init(modulus);
-        this->TestVectorOLE(size);
-      }
-    } else {
-      this->TestVectorOLE(size);
-    }
+TYPED_TEST(MPFSSKnownIndicesTest, TestVectorOLEVaryingSizes) {
+  int num_indices = 3;
+  for (int size = 10; size <= 50; size += 10) {
+    this->TestAllModuliVectorOLE(size, num_indices);
+  }
+}
+
+TYPED_TEST(MPFSSKnownIndicesTest, TestVectorOLEVaryingNumIndices) {
+  int size = 100;
+  for (int num_indices = 10; num_indices <= 30; num_indices += 10) {
+    this->TestAllModuliVectorOLE(size, num_indices);
   }
 }
 

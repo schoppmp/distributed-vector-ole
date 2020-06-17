@@ -22,6 +22,50 @@ DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
 ]
 
 cc_library(
+    name = "aes_uniform_bit_generator",
+    srcs = [
+        "aes_uniform_bit_generator.cpp",
+    ],
+    hdrs = [
+        "aes_uniform_bit_generator.h",
+    ],
+    deps = [
+        "@boringssl//:crypto",
+        "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+        "@mpc_utils//mpc_utils:status",
+        "@mpc_utils//mpc_utils:statusor",
+    ],
+)
+
+cc_test(
+    name = "aes_uniform_bit_generator_test",
+    size = "small",
+    srcs = [
+        "aes_uniform_bit_generator_test.cpp",
+    ],
+    deps = [
+        ":aes_uniform_bit_generator",
+        "@boringssl//:crypto",
+        "@mpc_utils//mpc_utils/testing:test_deps",
+    ],
+)
+
+cc_binary(
+    name = "aes_uniform_bit_generator_benchmark",
+    srcs = [
+        "aes_uniform_bit_generator_benchmark.cpp",
+    ],
+    deps = [
+        ":aes_uniform_bit_generator",
+        "@boringssl//:crypto",
+        "@com_google_benchmark//:benchmark_main",
+        "@mpc_utils//third_party/gperftools",
+    ],
+)
+
+cc_library(
     name = "ggm_tree",
     srcs = [
         "ggm_tree.cpp",
@@ -73,14 +117,11 @@ cc_library(
         "internal/all_but_one_random_ot_internal.h",
     ],
     deps = [
-        ":gf128",
         ":ggm_tree",
         ":ntl_helpers",
-        ":scalar_type_helpers",
+        ":scalar_helpers",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
-        "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/types:span",
-        "@mpc_utils//third_party/ntl",
     ],
 )
 
@@ -101,6 +142,7 @@ cc_library(
         ":gf128",
         ":ggm_tree",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
@@ -146,12 +188,12 @@ cc_library(
     ],
     deps = [
         ":all_but_one_random_ot",
+        ":ntl_helpers",
+        ":scalar_helpers",
         "@com_google_absl//absl/types:span",
-        "@mpc_utils//mpc_utils:benchmarker",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils/boost_serialization:abseil",
         "@mpc_utils//mpc_utils/boost_serialization:ntl",
-        "@mpc_utils//third_party/ntl",
     ],
 )
 
@@ -207,7 +249,9 @@ cc_library(
     deps = [
         ":all_but_one_random_ot",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
@@ -317,14 +361,17 @@ cc_library(
 )
 
 cc_library(
-    name = "scalar_type_helpers",
+    name = "scalar_helpers",
     hdrs = [
-        "internal/scalar_type_helpers.h",
+        "internal/scalar_helpers.h",
     ],
     visibility = ["//visibility:private"],
     deps = [
         ":gf128",
+        ":ntl_helpers",
+        "@boringssl//:crypto",
         "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:span",
         "@mpc_utils//third_party/ntl",
     ],
 )
@@ -337,9 +384,7 @@ cc_library(
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     visibility = ["//visibility:private"],
     deps = [
-        ":gf128",
-        ":ntl_helpers",
-        ":scalar_type_helpers",
+        ":scalar_helpers",
         "@boringssl//:crypto",
         "@com_github_emp_toolkit_emp_ot//:emp_ot",
         "@com_google_absl//absl/numeric:int128",
@@ -365,7 +410,6 @@ cc_library(
         "@com_google_absl//absl/memory",
         "@mpc_utils//mpc_utils:comm_channel",
         "@mpc_utils//mpc_utils:comm_channel_emp_adapter",
-        "@mpc_utils//mpc_utils:openssl_uniform_bit_generator",
         "@mpc_utils//mpc_utils:statusor",
     ],
 )
@@ -412,9 +456,10 @@ cc_library(
     ],
     copts = DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS,
     deps = [
+        ":aes_uniform_bit_generator",
         ":mpfss_known_indices",
+        ":scalar_helpers",
         ":scalar_vector_gilboa_product",
-        "@mpc_utils//mpc_utils:openssl_uniform_bit_generator",
         "@mpc_utils//mpc_utils/boost_serialization:eigen",
         "@mpc_utils//third_party/eigen",
     ],
@@ -470,5 +515,18 @@ cc_library(
         "@boost//:serialization",
         "@boringssl//:crypto",
         "@com_google_absl//absl/numeric:int128",
+    ],
+)
+
+cc_test(
+    name = "gf128_test",
+    srcs = [
+        "gf128_test.cpp",
+    ],
+    deps = [
+        ":gf128",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+        "@mpc_utils//mpc_utils/testing:test_deps",
     ],
 )

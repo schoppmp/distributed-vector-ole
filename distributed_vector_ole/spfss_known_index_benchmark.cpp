@@ -15,14 +15,14 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "benchmark/benchmark.h"
-#include "distributed_vector_ole/spfss_known_index.h"
 #include "distributed_vector_ole/gf128.h"
+#include "distributed_vector_ole/spfss_known_index.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
 namespace {
 
-template<typename T, bool measure_communication>
+template <typename T, bool measure_communication>
 static void BM_RunNative(benchmark::State &state) {
   mpc_utils::testing::CommChannelTestHelper helper(measure_communication);
   int64_t length = state.range(0);
@@ -74,14 +74,17 @@ static void BM_RunNative(benchmark::State &state) {
       benchmark::Counter(bytes_sent1, benchmark::Counter::kAvgIterations);
 }
 
-template<typename T, int num_bits, bool measure_communication>
+template <typename T, int num_bits, bool measure_communication>
 static void BM_RunNTL(benchmark::State &state) {
   switch (num_bits) {
-    case 8:T::init(NTL::conv<typename T::rep_type>("251"));  // 2^8 - 5
+    case 8:
+      T::init(NTL::conv<typename T::rep_type>("251"));  // 2^8 - 5
       break;
-    case 16:T::init(NTL::conv<typename T::rep_type>("65521"));  // 2^16 - 15
+    case 16:
+      T::init(NTL::conv<typename T::rep_type>("65521"));  // 2^16 - 15
       break;
-    case 32:T::init(NTL::conv<typename T::rep_type>("4294967291"));  // 2^32 - 5
+    case 32:
+      T::init(NTL::conv<typename T::rep_type>("4294967291"));  // 2^32 - 5
       break;
     case 60:
       T::init(
@@ -95,7 +98,8 @@ static void BM_RunNTL(benchmark::State &state) {
       T::init(NTL::conv<typename T::rep_type>(
           "340282366920938463463374607431768211297"));  // 2^128 - 159
       break;
-    default:assert(false);  // Unimplemented.
+    default:
+      assert(false);  // Unimplemented.
   }
   BM_RunNative<T, measure_communication>(state);
 }

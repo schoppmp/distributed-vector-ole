@@ -40,7 +40,7 @@ class ScalarVectorGilboaProduct {
   // Creates an instance of ScalarVectorGilboaProduct that
   // communicates over the given comm_channel
   static mpc_utils::StatusOr<std::unique_ptr<ScalarVectorGilboaProduct>> Create(
-      comm_channel* channel);
+      comm_channel* channel, double statistical_security_ = 40);
 
   // Runs the Gilboa product with a vector `y` as input, writing the output to
   // `output`.
@@ -76,10 +76,45 @@ class ScalarVectorGilboaProduct {
 
  private:
   ScalarVectorGilboaProduct(
-      std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter);
+      std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter,
+      double statistical_security);
+
+  template <typename T>
+  bool UseCorrelatedOT(int64_t size) {
+    // Compute statistical security needed for each element to ensure that
+    // `size` elements can be computed using correlated OT.
+    double statistical_security_per_element =
+        std::log2(double(size)) + statistical_security_;
+    int packed_hash_bits = ScalarHelper<T>::SizeOf() * 8;
+    return ScalarHelper<T>::CanBeHashedInto(statistical_security_per_element,
+                                            packed_hash_bits);
+  }
+
+  template <typename T>
+  std::vector<emp::block> RunOTSender(absl::Span<const emp::block> deltas,
+                                      uint64_t size) {
+    if (UseCorrelatedOT<T>(size)) {
+      return gilboa_internal::RunOTSenderCorrelated<T>(deltas, &ot_);
+    } else {
+      return gilboa_internal::RunOTSender1of2<T>(deltas, &ot_);
+    }
+  }
+
+  template <typename T>
+  std::vector<emp::block> RunOTReceiver(absl::Span<const bool> choices,
+                                        uint64_t size) {
+    std::vector<emp::block> result(choices.size());
+    if (UseCorrelatedOT<T>(size)) {
+      ot_.recv_cot(result.data(), choices.data(), choices.size());
+    } else {
+      ot_.recv(result.data(), choices.data(), choices.size());
+    }
+    return result;
+  }
 
   std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter_;
   emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> ot_;
+  double statistical_security_;
 };
 
 template <typename T>
@@ -89,15 +124,14 @@ mpc_utils::Status ScalarVectorGilboaProduct::RunVectorProvider(
     return mpc_utils::InvalidArgumentError(
         "`y` and `output` must have the same size");
   }
-  if (gilboa_internal::SizeOf<T>() > 16) {
+  if (ScalarHelper<T>::SizeOf() > 16) {
     return mpc_utils::InvalidArgumentError(
         "Integers may be at most 16 bytes long");
   }
   int64_t y_len = y.size();
-  int bit_width = gilboa_internal::SizeOf<T>() * 8;
-  int stride =
-      16 / gilboa_internal::SizeOf<T>();  // Number of packed integers in a
-                                          // single 128-bit OT message.
+  int bit_width = ScalarHelper<T>::SizeOf() * 8;
+  int stride = 16 / ScalarHelper<T>::SizeOf();  // Number of packed integers in
+                                                // a single 128-bit OT message.
   int64_t n =
       bit_width * ((y_len + stride - 1) /
                    stride);  // Total number of OTs. Account for the fact
@@ -105,8 +139,8 @@ mpc_utils::Status ScalarVectorGilboaProduct::RunVectorProvider(
   std::vector<emp::block> deltas(n);
   NTL::Vec<T> powers_of_two;
   powers_of_two.SetLength(bit_width);
-  for(int i = 0; i < bit_width; i++) {
-    powers_of_two[i] = gilboa_internal::PowerOf2<T>(i);
+  for (int i = 0; i < bit_width; i++) {
+    powers_of_two[i] = ScalarHelper<T>::SetBit(i);
   }
   for (int64_t i = 0; i < y_len; i += stride) {
     // `data` is the data to be packed in one OT execution.
@@ -114,20 +148,20 @@ mpc_utils::Status ScalarVectorGilboaProduct::RunVectorProvider(
     for (int j = 0; j < bit_width; j++) {
       // For each bit j of x, we run a COT with correlation correlation function
       // f(y) = 2^j * b - y, for which we store 2^j * b in deltas.
-      deltas[(i / stride) * bit_width + j] = gilboa_internal::SpanToEMPBlock<T>(
-          data, powers_of_two[j]);
+      deltas[(i / stride) * bit_width + j] =
+          gilboa_internal::SpanToEMPBlock<T>(data, powers_of_two[j]);
     }
   }
   std::fill(output.begin(), output.end(), T(0));
-  std::vector<emp::block> ot_result =
-      gilboa_internal::RunOTSender<T>(deltas, &ot_);
+  std::vector<emp::block> ot_result = RunOTSender<T>(deltas, y_len);
   channel_adapter_->flush();
   NTL::Vec<T> data;
   data.SetLength(stride);
   for (int64_t i = 0; i < y_len; i += stride) {
     for (int j = 0; j < bit_width; j++) {
       gilboa_internal::EMPBlockToSpan<T>(
-          ot_result[(i / stride) * bit_width + j], absl::MakeSpan(data.data(), data.length()));
+          ot_result[(i / stride) * bit_width + j],
+          absl::MakeSpan(data.data(), data.length()));
       for (int k = 0; k < stride && (i + k) < y_len; ++k) {
         output[i + k] -= data[k];
       }
@@ -140,14 +174,13 @@ template <typename T>
 mpc_utils::Status ScalarVectorGilboaProduct::RunValueProvider(
     T x, absl::Span<T> output) {
   int y_len = output.size();
-  if (gilboa_internal::SizeOf<T>() > 16) {
+  if (ScalarHelper<T>::SizeOf() > 16) {
     return mpc_utils::InvalidArgumentError(
         "Integers may be at most 16 bytes long");
   }
-  int bit_width = gilboa_internal::SizeOf<T>() * 8;
-  int stride =
-      16 / gilboa_internal::SizeOf<T>();  // Number of packed integers in a
-                                          // single 128-bit OT message.
+  int bit_width = ScalarHelper<T>::SizeOf() * 8;
+  int stride = 16 / ScalarHelper<T>::SizeOf();  // Number of packed integers in
+                                                // a single 128-bit OT message.
   int64_t n =
       bit_width * ((y_len + stride - 1) /
                    stride);  // Total number of OTs. Account for the fact
@@ -160,15 +193,15 @@ mpc_utils::Status ScalarVectorGilboaProduct::RunValueProvider(
     }
   }
   std::fill(output.begin(), output.end(), T(0));
-  std::vector<emp::block> ot_result =
-      gilboa_internal::RunOTReceiver<T>(choices, &ot_);
+  std::vector<emp::block> ot_result = RunOTReceiver<T>(choices, y_len);
   channel_adapter_->flush();
   NTL::Vec<T> data;
   data.SetLength(stride);
   for (int64_t i = 0; i < y_len; i += stride) {
     for (int j = 0; j < bit_width; j++) {
       gilboa_internal::EMPBlockToSpan<T>(
-          ot_result[(i / stride) * bit_width + j], absl::MakeSpan(data.data(), data.length()));
+          ot_result[(i / stride) * bit_width + j],
+          absl::MakeSpan(data.data(), data.length()));
       for (int k = 0; k < stride && (i + k) < y_len; ++k) {
         output[i + k] += data[k];
       }

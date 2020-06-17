@@ -46,10 +46,12 @@ class MPFSSKnownIndices {
   // Creates an instance of MPFSSKnownIndices that communicates over the
   // given comm_channel. Optionally accepts a pointer to an existing
   // ScalarVectorGilboaProduct instance. If omitted, a new instance will be
-  // created and managed by this class.
+  // created with the given statistical security parameter and managed by this
+  // class.
   static mpc_utils::StatusOr<std::unique_ptr<MPFSSKnownIndices>> Create(
       mpc_utils::comm_channel* channel,
-      ScalarVectorGilboaProduct* gilboa = nullptr);
+      ScalarVectorGilboaProduct* gilboa = nullptr,
+      double statistical_security = 40);
 
   // Does nothing if cached_output_size_ == output_size. Otherwise hashes the
   // interval [0, output_size) using hasher_, and saves the result in buckets_.
@@ -91,18 +93,13 @@ class MPFSSKnownIndices {
                                               absl::Span<T> output);
 
  private:
-  MPFSSKnownIndices(
-      std::unique_ptr<CuckooHasher> hasher,
-      std::vector<std::unique_ptr<SPFSSKnownIndex>> spfss,
-      std::vector<std::unique_ptr<mpc_utils::comm_channel>> channels,
-      std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa,
-      ScalarVectorGilboaProduct* gilboa);
+  MPFSSKnownIndices(std::unique_ptr<CuckooHasher> hasher,
+                    std::unique_ptr<SPFSSKnownIndex> spfss,
+                    std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa,
+                    ScalarVectorGilboaProduct* gilboa);
 
-  // Constants for cuckoo hashing.
+  // Number of hash functions for cuckoo hashing.
   static const int kNumHashFunctions = 3;
-  static constexpr int NumBuckets(int num_indices) {
-    return num_indices < 200 ? 300 : num_indices + num_indices / 2;
-  }
 
   // Precomputed mapping of output indices to buckets.
   std::vector<std::vector<int64_t>> buckets_;
@@ -118,11 +115,8 @@ class MPFSSKnownIndices {
   // CuckooHasher instance used for assigning indices to buckets.
   std::unique_ptr<CuckooHasher> hasher_;
 
-  // Single-point FSS instances. One for each OpenMP thread.
-  std::vector<std::unique_ptr<SPFSSKnownIndex>> spfss_;
-
-  // Communication channels used by SPFSS instances.
-  std::vector<std::unique_ptr<mpc_utils::comm_channel>> channels_;
+  // Single-point FSS instance.
+  std::unique_ptr<SPFSSKnownIndex> spfss_;
 
   // Gilboa multiplication instance. If `gilboa` was not passed at construction,
   // `gilboa_` it is equal to `owned_gilboa_.get()`.
@@ -146,29 +140,18 @@ mpc_utils::Status MPFSSKnownIndices::RunValueProviderVectorOLE(
     val = T(0);
   }
 
-  NTLContext<T> context;
-  context.save();
-#pragma omp parallel num_threads(spfss_.size())
-  {
-    context.restore();
-    int thread_id = 0;
-#ifdef _OPENMP
-    thread_id = omp_get_thread_num();
-#endif
-    // Compute FSS for each bucket, and map the results  back to `output`.
-#pragma omp for schedule(static)
-    for (int i = 0; i < num_buckets; i++) {
-      int bucket_size = buckets_[i].size();
-      if (bucket_size == 0) {
-        continue;
-      }
-      std::vector<T> bucket_outputs(bucket_size);
-      spfss_[thread_id]->RunValueProvider<T>(val_share[i],
-                                             absl::MakeSpan(bucket_outputs));
-#pragma omp critical
-      for (int j = 0; j < bucket_size; j++) {
-        output[buckets_[i][j]] += bucket_outputs[j];
-      }
+  std::vector<std::vector<T>> bucket_outputs(num_buckets);
+  std::vector<absl::Span<T>> bucket_output_spans(num_buckets);
+  for (int i = 0; i < num_buckets; i++) {
+    bucket_outputs[i] = std::vector<T>(buckets_[i].size(), T(0));
+    bucket_output_spans[i] = absl::MakeSpan(bucket_outputs[i]);
+  }
+  // Compute FSS for each bucket, and map the results  back to `output`.
+  RETURN_IF_ERROR(spfss_->RunValueProviderBatched<T>(
+      absl::MakeConstSpan(val_share), absl::MakeSpan(bucket_output_spans)));
+  for (int i = 0; i < num_buckets; i++) {
+    for (int j = 0; j < static_cast<int>(buckets_[i].size()); j++) {
+      output[buckets_[i][j]] += bucket_outputs[i][j];
     }
   }
   return mpc_utils::OkStatus();
@@ -190,11 +173,17 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
     return mpc_utils::InvalidArgumentError(
         "`y` and `indices` must not be empty");
   }
+  for (int i = 0; i < static_cast<int>(indices.size()); i++) {
+    if (indices[i] > static_cast<int64_t>(output.size())) {
+      return mpc_utils::InvalidArgumentError(
+          absl::StrCat("`indices[", i, "`] out of range"));
+    }
+  }
   RETURN_IF_ERROR(UpdateBuckets(output.size(), y.size()));
   int num_buckets = buckets_.size();
   // Checking for uniqueness of `indices` takes time, so we only do that if
   // cuckoo hashing fails.
-  auto status = hasher_->HashCuckoo(indices, y, num_buckets);
+  auto status = hasher_->HashCuckoo(indices, num_buckets);
   if (!status.ok() && mpc_utils::IsInternal(status.status()) &&
       status.status().message() ==
           "Failed to insert element, maximum number of tries exhausted") {
@@ -204,14 +193,15 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
       return mpc_utils::InvalidArgumentError("All `indices` must be unique");
     }
   }
-  ASSIGN_OR_RETURN(auto hashed_inputs, status);
+  ASSIGN_OR_RETURN(auto hashed_inputs, std::move(status));
 
   // y padded with zeros and permuted according to hashed_inputs:
-  // y_permuted[i] = y[j] if hashed_inputs[i] == j, and 0 otherwise.
+  // y_permuted[i] = y[j] if hashed_inputs[i] == j, and 0 if hashed_inputs[i] ==
+  // -1.
   std::vector<T> y_permuted(num_buckets, T(0));
   for (int i = 0; i < num_buckets; i++) {
-    if (hashed_inputs[i]) {
-      y_permuted[i] = hashed_inputs[i]->second;
+    if (hashed_inputs[i] != -1) {
+      y_permuted[i] = y[hashed_inputs[i]];
     }
   }
   ASSIGN_OR_RETURN(std::vector<T> val_share,
@@ -220,39 +210,31 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
   // Zero out `output`.
   std::fill(output.begin(), output.end(), T(0));
 
-  NTLContext<T> context;
-  context.save();
-#pragma omp parallel num_threads(spfss_.size())
-  {
-    context.restore();
-    int thread_id = 0;
-#ifdef _OPENMP
-    thread_id = omp_get_thread_num();
-#endif
-    // Compute FSS for each bucket, and map the results  back to `output`.
-#pragma omp for schedule(static)
-    for (int i = 0; i < num_buckets; i++) {
-      int bucket_size = buckets_[i].size();
-      if (bucket_size == 0) {
-        continue;
-      }
-      int index_in_bucket = 0;
-      if (hashed_inputs[i]) {
-        // Find the index in the bucket. We can assume the bucket is sorted,
-        // as it is created in ascending order in UpdateBuckets, and
-        // HashSimple preserves the order.
-        index_in_bucket =
-            std::lower_bound(buckets_[i].begin(), buckets_[i].end(),
-                             hashed_inputs[i]->first) -
-            buckets_[i].begin();
-      }
-      std::vector<T> bucket_outputs(bucket_size);
-      spfss_[thread_id]->RunIndexProvider(val_share[i], index_in_bucket,
-                                          absl::MakeSpan(bucket_outputs));
-#pragma omp critical
-      for (int j = 0; j < bucket_size; j++) {
-        output[buckets_[i][j]] += bucket_outputs[j];
-      }
+  std::vector<std::vector<T>> bucket_outputs(num_buckets);
+  std::vector<absl::Span<T>> bucket_output_spans(num_buckets);
+  std::vector<int64_t> index_in_bucket(num_buckets, 0);
+  for (int i = 0; i < num_buckets; i++) {
+    if (buckets_[i].empty()) {
+      continue;
+    }
+    bucket_outputs[i] = std::vector<T>(buckets_[i].size(), T(0));
+    bucket_output_spans[i] = absl::MakeSpan(bucket_outputs[i]);
+    if (hashed_inputs[i] != -1) {
+      // Find the index in the bucket. We can assume the bucket is sorted,
+      // as it is created in ascending order in UpdateBuckets, and
+      // HashSimple preserves the order.
+      index_in_bucket[i] =
+          std::lower_bound(buckets_[i].begin(), buckets_[i].end(),
+                           indices[hashed_inputs[i]]) -
+          buckets_[i].begin();
+    }
+  }
+  spfss_->RunIndexProviderBatched(absl::MakeConstSpan(val_share),
+                                  absl::MakeConstSpan(index_in_bucket),
+                                  absl::MakeSpan(bucket_output_spans));
+  for (int i = 0; i < num_buckets; i++) {
+    for (int j = 0; j < static_cast<int>(buckets_[i].size()); j++) {
+      output[buckets_[i][j]] += bucket_outputs[i][j];
     }
   }
   return mpc_utils::OkStatus();

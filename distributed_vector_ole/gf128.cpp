@@ -1,5 +1,6 @@
-// Copyright 2019 the libiop authors (https://github.com/scipr-lab/libiop/blob/master/AUTHORS),
-// licensed under the MIT license.
+// Copyright 2019 the libiop authors
+// (https://github.com/scipr-lab/libiop/blob/master/AUTHORS), licensed under the
+// MIT license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +26,8 @@
 
 #ifdef USE_ASM
 #include <emmintrin.h>
-#include <smmintrin.h>
 #include <immintrin.h>
+#include <smmintrin.h>
 #endif
 
 namespace distributed_vector_ole {
@@ -34,19 +35,15 @@ namespace distributed_vector_ole {
 const uint64_t gf128::modulus_;
 gf128 gf128::multiplicative_generator = gf128(2);
 
-gf128::gf128() : value_{0, 0} {
-}
+gf128::gf128() : value_{0, 0} {}
 
-gf128::gf128(const uint64_t value_low) : value_{value_low, 0} {
-}
+gf128::gf128(const uint64_t value_low) : value_{value_low, 0} {}
 
-gf128::gf128(const uint64_t value_high, const uint64_t value_low) :
-    value_{value_low, value_high} {
-}
+gf128::gf128(const uint64_t value_high, const uint64_t value_low)
+    : value_{value_low, value_high} {}
 
-gf128::gf128(const absl::uint128 value) :
-    value_{absl::Uint128Low64(value), absl::Uint128High64(value)} {
-}
+gf128::gf128(const absl::uint128 value)
+    : value_{absl::Uint128Low64(value), absl::Uint128High64(value)} {}
 
 std::vector<uint64_t> gf128::as_words() const {
   return std::vector<uint64_t>({this->value_[0], this->value_[1]});
@@ -71,26 +68,30 @@ gf128 &gf128::operator-=(const gf128 &other) {
 #ifdef USE_ASM
 __attribute__((target("pclmul,sse2")))
 #endif
-gf128 &gf128::operator*=(const gf128 &other) {
+gf128 &
+gf128::operator*=(const gf128 &other) {
   /* Does not require *this and other to be different, and therefore
      also works for squaring, implemented below. */
 #ifdef USE_ASM
   /* load the two operands and the modulus into 128-bit registers */
-  const __m128i a = _mm_loadu_si128((const __m128i*) &(this->value_));
-  const __m128i b = _mm_loadu_si128((const __m128i*) &(other.value_));
-  const __m128i modulus = _mm_loadl_epi64((const __m128i*) &(this->modulus_));
+  const __m128i a = _mm_loadu_si128((const __m128i *)&(this->value_));
+  const __m128i b = _mm_loadu_si128((const __m128i *)&(other.value_));
+  const __m128i modulus = _mm_loadl_epi64((const __m128i *)&(this->modulus_));
 
   /* compute the 256-bit result of a * b with the 64x64-bit multiplication
      intrinsic */
   __m128i mul256_high = _mm_clmulepi64_si128(a, b, 0x11); /* high of both */
-  __m128i mul256_low = _mm_clmulepi64_si128(a, b, 0x00); /* low of both */
+  __m128i mul256_low = _mm_clmulepi64_si128(a, b, 0x00);  /* low of both */
 
-  __m128i mul256_mid1 = _mm_clmulepi64_si128(a, b, 0x01); /* low of a, high of b */
-  __m128i mul256_mid2 = _mm_clmulepi64_si128(a, b, 0x10); /* high of a, low of b */
+  __m128i mul256_mid1 =
+      _mm_clmulepi64_si128(a, b, 0x01); /* low of a, high of b */
+  __m128i mul256_mid2 =
+      _mm_clmulepi64_si128(a, b, 0x10); /* high of a, low of b */
 
   /* Add the 4 terms together */
   __m128i mul256_mid = _mm_xor_si128(mul256_mid1, mul256_mid2);
-  /* lower 64 bits of mid don't intersect with high, and upper 64 bits don't intersect with low */
+  /* lower 64 bits of mid don't intersect with high, and upper 64 bits don't
+   * intersect with low */
   mul256_high = _mm_xor_si128(mul256_high, _mm_srli_si128(mul256_mid, 8));
   mul256_low = _mm_xor_si128(mul256_low, _mm_slli_si128(mul256_mid, 8));
 
@@ -105,7 +106,7 @@ gf128 &gf128::operator*=(const gf128 &other) {
   tmp = _mm_clmulepi64_si128(mul256_high, modulus, 0x00);
   mul256_low = _mm_xor_si128(mul256_low, tmp);
 
-  _mm_storeu_si128((__m128i*) this->value_, mul256_low);
+  _mm_storeu_si128((__m128i *)this->value_, mul256_low);
 
   return (*this);
 #else
@@ -128,7 +129,6 @@ gf128 &gf128::operator*=(const gf128 &other) {
         shifted[0] = shifted[0] << 1;
       }
     }
-
   }
 
   this->value_[0] = result[0];
@@ -138,9 +138,7 @@ gf128 &gf128::operator*=(const gf128 &other) {
 #endif
 }
 
-void gf128::square() {
-  this->operator*=(*this);
-}
+void gf128::square() { this->operator*=(*this); }
 
 gf128 gf128::operator+(const gf128 &other) const {
   gf128 result(*this);
@@ -198,7 +196,8 @@ void gf128::randomize() {
 }
 
 bool gf128::operator==(const gf128 &other) const {
-  return (this->value_[0] == other.value_[0]) && ((this->value_[1] == other.value_[1]));
+  return (this->value_[0] == other.value_[0]) &&
+         ((this->value_[1] == other.value_[1]));
 }
 
 bool gf128::operator!=(const gf128 &other) const {
@@ -215,17 +214,14 @@ gf128 gf128::random_element() {
   return result;
 }
 
-gf128 gf128::zero() {
-  return gf128(0);
-}
+gf128 gf128::zero() { return gf128(0); }
 
-gf128 gf128::one() {
-  return gf128(1);
-}
+gf128 gf128::one() { return gf128(1); }
 
-} // namespace distributed_vector_ole
+}  // namespace distributed_vector_ole
 
-std::ostream& operator<< (std::ostream& os, const distributed_vector_ole::gf128 x) {
+std::ostream &operator<<(std::ostream &os,
+                         const distributed_vector_ole::gf128 x) {
   os << "gf128(" << static_cast<absl::uint128>(x) << ")";
   return os;
 }

@@ -14,8 +14,8 @@
 //    You should have received a copy of the GNU Affero General Public License
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DISTRIBUTED_VECTOR_OLE_INTERNAL_IS_MODULAR_INTEGER_H_
-#define DISTRIBUTED_VECTOR_OLE_INTERNAL_IS_MODULAR_INTEGER_H_
+#ifndef DISTRIBUTED_VECTOR_OLE_INTERNAL_NTL_HELPERS_H_
+#define DISTRIBUTED_VECTOR_OLE_INTERNAL_NTL_HELPERS_H_
 
 // Helpers to generically work with multiple NTL types. Currently includes:
 // - A type trait `is_modular_integer<T>` for SFINAE checks
@@ -70,4 +70,4 @@ T* NTLTemp();
 
 }  // namespace distributed_vector_ole
 
-#endif  // DISTRIBUTED_VECTOR_OLE_INTERNAL_IS_MODULAR_INTEGER_H_
+#endif  // DISTRIBUTED_VECTOR_OLE_INTERNAL_NTL_HELPERS_H_

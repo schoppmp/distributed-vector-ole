@@ -114,16 +114,16 @@ TYPED_TEST(AllButOneRandomOTTest, TestSmallVectors) {
   }
 }
 
-TYPED_TEST(AllButOneRandomOTTest, TestEmptyOutputSender) {
-  auto status = this->all_but_one_rot_0_->RunSender(absl::Span<int>());
-  ASSERT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "`output` must not be empty");
-}
+TYPED_TEST(AllButOneRandomOTTest, TestEmpty) { this->TestVector(0, 0); }
 
-TYPED_TEST(AllButOneRandomOTTest, TestEmptyOutputReceiver) {
-  auto status = this->all_but_one_rot_1_->RunReceiver(0, absl::Span<int>());
+TYPED_TEST(AllButOneRandomOTTest, TestDifferentSizesReceiverMulti) {
+  std::vector<int> output = {1};
+  std::vector<absl::Span<int>> outputs = {absl::MakeSpan(output)};
+  auto status = this->all_but_one_rot_1_->RunReceiverBatched(
+      absl::Span<int64_t>(), absl::MakeSpan(outputs));
   ASSERT_FALSE(status.ok());
-  EXPECT_EQ(status.message(), "`output` must not be empty");
+  EXPECT_EQ(status.message(),
+            "`indices` and `outputs` must have the same size");
 }
 
 TYPED_TEST(AllButOneRandomOTTest, TestIndexNegative) {
@@ -140,6 +140,13 @@ TYPED_TEST(AllButOneRandomOTTest, TestIndexTooLarge) {
       dummy.size(), absl::MakeSpan(dummy.data(), dummy.size()));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`index` out of range");
+}
+
+TYPED_TEST(AllButOneRandomOTTest, TestNegativeStatisticalSecurity) {
+  auto status = AllButOneRandomOT::Create(this->helper_.GetChannel(0), -1.0);
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(status.status().message(),
+            "`statistical_security` must not be negative.");
 }
 
 TEST(AllButOneRandomOT, TestNullChannel) {
