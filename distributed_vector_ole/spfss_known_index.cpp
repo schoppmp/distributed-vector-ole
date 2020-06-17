@@ -24,12 +24,17 @@ SPFSSKnownIndex::SPFSSKnownIndex(
     : channel_(channel), all_but_one_rot_(std::move(all_but_one_rot)) {}
 
 mpc_utils::StatusOr<std::unique_ptr<SPFSSKnownIndex>> SPFSSKnownIndex::Create(
-    mpc_utils::comm_channel* channel) {
+    mpc_utils::comm_channel* channel, double statistical_security) {
   if (!channel) {
     return mpc_utils::InvalidArgumentError("`channel` must not be NULL");
   }
+  if (statistical_security < 0) {
+    return mpc_utils::InvalidArgumentError(
+        "`statistical_security` must not be negative.");
+  }
   // Create AllButOneRandomOT protocol.
-  ASSIGN_OR_RETURN(auto all_but_one_rot, AllButOneRandomOT::Create(channel));
+  ASSIGN_OR_RETURN(auto all_but_one_rot,
+                   AllButOneRandomOT::Create(channel, statistical_security));
   return absl::WrapUnique(
       new SPFSSKnownIndex(channel, std::move(all_but_one_rot)));
 }

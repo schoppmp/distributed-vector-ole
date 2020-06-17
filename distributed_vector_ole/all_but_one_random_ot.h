@@ -22,9 +22,9 @@
 // except for the ith position, for which the receiver obtains nothing.
 
 #include <vector>
-#include "NTL/ZZ_p.h"
+#include "absl/strings/str_cat.h"
+#include "absl/types/span.h"
 #include "distributed_vector_ole/ggm_tree.h"
-#include "distributed_vector_ole/gf128.h"
 #include "distributed_vector_ole/internal/all_but_one_random_ot_internal.h"
 #include "emp-ot/emp-ot.h"
 #include "mpc_utils/benchmarker.hpp"
@@ -42,143 +42,174 @@ class AllButOneRandomOT {
   // Creates an instance of AllButOneRandomOT that communicates over the given
   // comm_channel.
   static mpc_utils::StatusOr<std::unique_ptr<AllButOneRandomOT>> Create(
-      mpc_utils::comm_channel* channel);
+      mpc_utils::comm_channel *channel, double statistical_security = 40);
 
   // Runs the Server side of the protocol. `output` must point to an array of
   // pre-allocated Ts.
   template <typename T>
   mpc_utils::Status RunSender(absl::Span<T> output) {
-    static_assert(sizeof(GGMTree::Block) % sizeof(T) == 0,
-                  "sizeof(T) must divide sizeof(GGMTree::Block)");
-    if (output.empty()) {
-      return mpc_utils::InvalidArgumentError("`output` must not be empty");
-    }
-
-    ASSIGN_OR_RETURN(auto tree, SendTree<T>(output.size(), 2));
-    all_but_one_random_ot_internal::UnpackLastLevel(*tree, output);
-    return mpc_utils::OkStatus();
+    return RunSenderBatched(absl::MakeSpan(&output, 1));
   }
 
   // Runs the Server side of the protocol. `output` must point to an array of
-  // pre-allocated Ts, and `ìndex` must be between 0 and output.size() - 1.
+  // pre-allocated Ts, and `index` must be between 0 and output.size() - 1.
+  // If `output` is empty, `index` is ignored.
   template <typename T>
   mpc_utils::Status RunReceiver(int64_t index, absl::Span<T> output) {
-    static_assert(sizeof(GGMTree::Block) % sizeof(T) == 0,
-                  "sizeof(T) must divide sizeof(GGMTree::Block)");
-    if (output.empty()) {
-      return mpc_utils::InvalidArgumentError("`output` must not be empty");
-    }
-    if (index < 0 || index >= static_cast<int64_t>(output.size())) {
+    if (index < 0 ||
+        (index >= static_cast<int64_t>(output.size()) && output.size() != 0)) {
       return mpc_utils::InvalidArgumentError("`index` out of range");
     }
-    ASSIGN_OR_RETURN(auto tree, ReceiveTree(output.size(), index, 2));
-    all_but_one_random_ot_internal::UnpackLastLevel(*tree, output);
+    return RunReceiverBatched(absl::MakeConstSpan(&index, 1),
+                              absl::MakeSpan(&output, 1));
+  }
+
+  template <typename T>
+  mpc_utils::Status RunSenderBatched(absl::Span<absl::Span<T>> outputs) {
+    std::vector<int64_t> sizes(outputs.size());
+    for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
+      sizes[i] = outputs[i].size();
+    }
+    ASSIGN_OR_RETURN(auto trees, SendTrees<T>(sizes, 2));
+    NTLContext<T> context;
+    context.save();
+#pragma omp parallel
+    {
+      context.restore();
+#pragma omp for schedule(dynamic)
+      for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
+        if (outputs[i].size() == 0) {
+          continue;  // Do nothing if output array is empty.
+        }
+        all_but_one_random_ot_internal::UnpackLastLevel(*trees[i], outputs[i]);
+      }
+    }
+    return mpc_utils::OkStatus();
+  }
+
+  template <typename T>
+  mpc_utils::Status RunReceiverBatched(absl::Span<const int64_t> indices,
+                                       absl::Span<absl::Span<T>> outputs) {
+    if (outputs.size() != indices.size()) {
+      return mpc_utils::InvalidArgumentError(
+          "`indices` and `outputs` must have the same size");
+    }
+    for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
+      if (indices[i] < 0 ||
+          (indices[i] >= static_cast<int64_t>(outputs[i].size()) &&
+           outputs[i].size() != 0)) {
+        return mpc_utils::InvalidArgumentError(
+            absl::StrCat("`indices[", i, "]` out of range"));
+      }
+    }
+
+    std::vector<int64_t> sizes(outputs.size());
+    for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
+      sizes[i] = outputs[i].size();
+    }
+    ASSIGN_OR_RETURN(auto trees, ReceiveTrees(sizes, indices, 2));
+    NTLContext<T> context;
+    context.save();
+#pragma omp parallel
+    {
+      context.restore();
+#pragma omp for schedule(dynamic)
+      for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
+        if (outputs[i].size() == 0) {
+          continue;  // Do nothing if output array is empty.
+        }
+        all_but_one_random_ot_internal::UnpackLastLevel(*trees[i], outputs[i]);
+      }
+    }
     return mpc_utils::OkStatus();
   }
 
  private:
   AllButOneRandomOT(
-      mpc_utils::comm_channel* channel,
-      std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter);
+      mpc_utils::comm_channel *channel,
+      std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter,
+      double statistical_security);
 
-  // Constructs a GGMTree and obliviously sends it to the client, except for the
-  // values on the path to an index chosen by the client. If T is a NTL modular
-  // integer, ensures that when the leaves are subsequently reduced modulo
-  // `T::modulus()`, all residue classes are sampled with equal probability.
+  // For each element of `num_leaves`, constructs a GGMTree and obliviously
+  // sends it to the client, except for the values on the path to an index
+  // chosen by the client. If T is a NTL modular integer, ensures that when the
+  // leaves are subsequently reduced modulo `T::modulus()`, all residue classes
+  // are sampled with equal probability.
   template <typename T>
-  mpc_utils::StatusOr<std::unique_ptr<GGMTree>> SendTree(int64_t num_leaves,
-                                                         int arity);
+  mpc_utils::StatusOr<std::vector<std::unique_ptr<GGMTree>>> SendTrees(
+      absl::Span<const int64_t> num_leaves, int arity);
 
-  // Checks if the tree should be accepted to ensure equal probability of each
-  // leaf value. Called by `SendTree`.
-  // GF128 elements.
-  template<typename T, typename std::enable_if<
-      std::is_same<T, gf128>::value, int>::type = 0>
-  bool AcceptTree(const GGMTree& tree) { return true; }
-  // Integral types.
-  template <typename T, typename std::enable_if<
-      std::numeric_limits<T>::is_integer, int>::type = 0>
-  bool AcceptTree(const GGMTree& tree) { return true; }
-  // NTL modular integers. Implemented below.
-  template <typename T,
-      typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-  bool AcceptTree(const GGMTree& tree);
+  // Obliviously receives GGMTrees, where the i-th tree is equal to the server's
+  // except at `indices[i]`.
+  mpc_utils::StatusOr<std::vector<std::unique_ptr<GGMTree>>> ReceiveTrees(
+      absl::Span<const int64_t> num_leaves, absl::Span<const int64_t> indices,
+      int arity);
 
-  // Obliviously receives a GGMTree that is equal to the server's except at
-  // `index`.
-  mpc_utils::StatusOr<std::unique_ptr<GGMTree>> ReceiveTree(int64_t num_leaves,
-                                                            int64_t index,
-                                                            int arity);
-
-  mpc_utils::comm_channel* channel_;
+  mpc_utils::comm_channel *channel_;
   std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter_;
   emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> ot_extension_;
+  double statistical_security_;
 };
 
 template <typename T>
-mpc_utils::StatusOr<std::unique_ptr<GGMTree>> AllButOneRandomOT::SendTree(
-    int64_t num_leaves, int arity) {
-  std::unique_ptr<GGMTree> tree;
-  while (!tree) {
+mpc_utils::StatusOr<std::vector<std::unique_ptr<GGMTree>>>
+AllButOneRandomOT::SendTrees(absl::Span<const int64_t> num_leaves, int arity) {
+  int num_trees = static_cast<int>(num_leaves.size());
+  // Check the modulus to satisfy statistical security.
+  int64_t total_num_leaves =
+      std::accumulate(num_leaves.begin(), num_leaves.end(), 0);
+  // Statistical security needed for each leaf to ensure that all leaves are
+  // uniform.
+  double statistical_security_per_leaf =
+      std::log2(double(total_num_leaves)) + statistical_security_;
+  if (!ScalarHelper<T>::CanBeHashedInto(statistical_security_per_leaf)) {
+    return mpc_utils::InvalidArgumentError(
+        absl::StrCat("Cannot ensure statistical security of ",
+                     statistical_security_, "bits with the given modulus"));
+  }
+
+  std::vector<std::unique_ptr<GGMTree>> trees(num_trees);
+  std::vector<emp::block> opt0, opt1;
+  std::vector<int> offsets(num_trees + 1, 0);
+  std::vector<GGMTree::Block> keys(arity);
+  for (int i = 0; i < arity; i++) {
+    RAND_bytes(reinterpret_cast<uint8_t *>(&keys[i]), GGMTree::kBlockSize);
+  }
+  for (int i = 0; i < num_trees; i++) {
+    if (num_leaves[i] == 0) {
+      offsets[i + 1] = offsets[i];
+      continue;
+    }
+
     // Create tree from random seed.
     GGMTree::Block seed;
-    RAND_bytes(reinterpret_cast<unsigned char*>(&seed), sizeof(seed));
-    ASSIGN_OR_RETURN(tree, GGMTree::Create(arity, num_leaves, seed));
+    RAND_bytes(reinterpret_cast<unsigned char *>(&seed), sizeof(seed));
+    ASSIGN_OR_RETURN(trees[i], GGMTree::Create(num_leaves[i], seed, keys));
 
-    // Rejection sampling.
-    if (!AcceptTree<T>(*tree)) {
-      tree.reset();
+    offsets[i + 1] = offsets[i] + trees[i]->num_levels() - 1;
+    assert(offsets[i + 1] >= offsets[i]);
+
+    auto xors = trees[i]->GetSiblingWiseXOR();
+    opt0.resize(offsets[i + 1]);
+    opt1.resize(offsets[i + 1]);
+
+    // Set opt0 (resp. opt1) to xor of left (resp. right) siblings for each
+    // level
+    for (int j = 0; j < static_cast<int>(trees[i]->num_levels()) - 1; ++j) {
+      opt0[offsets[i] + j] =
+          all_but_one_random_ot_internal::GGMTreeToEMPBlock(xors[j][0]);
+      opt1[offsets[i] + j] =
+          all_but_one_random_ot_internal::GGMTreeToEMPBlock(xors[j][1]);
     }
   }
 
-  auto xors = tree->GetSiblingWiseXOR();
-
-  std::vector<emp::block> opt0(tree->num_levels() - 1);
-  std::vector<emp::block> opt1(tree->num_levels() - 1);
-
-  // Set opt0 (resp. opt1) to xor of left (resp. right) siblings for each level
-  for (auto i = 0; i < tree->num_levels() - 1; ++i) {
-    opt0[i] = all_but_one_random_ot_internal::GGMTreeToEMPBlock(xors[i][0]);
-    opt1[i] = all_but_one_random_ot_internal::GGMTreeToEMPBlock(xors[i][1]);
+  if (opt0.size() > 0) {
+    ot_extension_.send(opt0.data(), opt1.data(), opt0.size());
   }
 
-  ot_extension_.send(opt0.data(), opt1.data(), tree->num_levels() - 1);
-  channel_adapter_->send_data(tree->keys().data(),
-                              sizeof(GGMTree::Block) * arity);
+  channel_adapter_->send_data(keys.data(), sizeof(GGMTree::Block) * arity);
   channel_adapter_->flush();
-
-  return tree;
-}
-
-// Template specializations for AcceptTree.
-
-// NTL modular integers.
-template <typename T,
-          typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-bool AllButOneRandomOT::AcceptTree(const GGMTree& tree) {
-  // Reject tree if any leaf is too close to 2^128 to ensure values reduced
-  // modulo `modulus` have all equal probability.
-  absl::uint128 upper_bound = std::numeric_limits<absl::uint128>::max();
-  // Use NTL::ZZ explicitly in case T is smaller than 64 bits.
-  NTL::ZZ upper_bound_zz(1);
-  upper_bound_zz <<= 128;
-  upper_bound_zz -= upper_bound_zz % NTL::conv<NTL::ZZ>(T::modulus());
-  if (NTL::NumBits(upper_bound_zz) <= 128) {
-    uint64_t low = NTL::conv<uint64_t>(upper_bound_zz);
-    uint64_t high = NTL::conv<uint64_t>(upper_bound_zz >> 64);
-    upper_bound = absl::MakeUint128(high, low);
-  }
-  bool tree_valid = true;
-#pragma omp parallel
-  {
-#pragma omp for reduction(& : tree_valid) schedule(static)
-    for (int64_t i = 0; i < tree.num_leaves(); i++) {
-      // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
-      absl::uint128 leaf = tree.GetValueAtLeaf(i).ValueOrDie();
-      tree_valid &= (leaf < upper_bound);
-    }
-  }
-  return tree_valid;
+  return trees;
 }
 
 }  // namespace distributed_vector_ole

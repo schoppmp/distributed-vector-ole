@@ -21,12 +21,15 @@
 #include <cmath>
 #include <functional>
 #include "absl/memory/memory.h"
+#include "absl/types/span.h"
 #include "mpc_utils/canonical_errors.h"
 #include "mpc_utils/status.h"
 #include "mpc_utils/status_macros.h"
 #include "mpc_utils/statusor.h"
 #include "openssl/err.h"
 #include "openssl/rand.h"
+
+#pragma omp declare reduction(^: absl::uint128: omp_out ^= omp_in) initializer (omp_priv = 0)
 
 namespace distributed_vector_ole {
 
@@ -59,27 +62,21 @@ mpc_utils::StatusOr<std::vector<std::vector<GGMTree::Block>>> AllocateLevels(
 // XORs `in` in batches of `out.size()` blocks onto `out`.
 void XORBlocks(absl::Span<const GGMTree::Block> in,
                absl::Span<GGMTree::Block> out) {
-  // We split each block into 64-bit subblocks, as OpenMP only supports
-  // certain types for reductions.
-  uint64_t* out_data = reinterpret_cast<uint64_t*>(out.data());
-  const uint64_t* in_data = reinterpret_cast<const uint64_t*>(in.data());
-  const int num_subblocks = sizeof(GGMTree::Block) / sizeof(uint64_t);
+  GGMTree::Block* out_data = out.data();
+  const GGMTree::Block* in_data = in.data();
   int64_t batch_size = out.size();
 
   // Use threads for the outer loop over batches.
   int64_t num_batches = (in.size() + batch_size - 1) / batch_size;
-#pragma omp parallel for reduction(^:out_data[:batch_size * num_subblocks]) schedule(guided)
+#pragma omp parallel for reduction(^ : out_data[:batch_size]) schedule(guided)
   for (int64_t batch = 0; batch < num_batches; batch++) {
     int64_t num_blocks = std::min(
         batch_size, static_cast<int64_t>(in.size()) - batch * batch_size);
 
     // The blocks in each batch can be XORed 1:1 onto the result.
     for (int block = 0; block < num_blocks; block++) {
-      for (int subblock = 0; subblock < num_subblocks; subblock++) {
-        int child = batch * batch_size + block;
-        out_data[block * num_subblocks + subblock] ^=
-            in_data[child * num_subblocks + subblock];
-      }
+      int child = batch * batch_size + block;
+      out_data[block] ^= in_data[child];
     }
   }
 }
@@ -96,7 +93,8 @@ GGMTree::Block ComputePRG(const GGMTree::Block& seed, const AES_KEY& key) {
 }  // namespace
 
 mpc_utils::StatusOr<std::unique_ptr<GGMTree>> GGMTree::Create(
-    int arity, int64_t num_leaves, Block seed) {
+    int64_t num_leaves, Block seed, std::vector<Block> keys) {
+  int arity = static_cast<int>(keys.size());
   if (arity < 2) {
     return mpc_utils::InvalidArgumentError("arity must be at least 2");
   }
@@ -107,11 +105,9 @@ mpc_utils::StatusOr<std::unique_ptr<GGMTree>> GGMTree::Create(
   ASSIGN_OR_RETURN(auto levels, AllocateLevels(arity, num_leaves));
   levels[0][0] = seed;
 
-  // Generate keys.
-  std::vector<Block> keys(arity);
+  // Expand keys.
   std::vector<AES_KEY> expanded_keys(arity);
   for (int i = 0; i < arity; i++) {
-    RAND_bytes(reinterpret_cast<uint8_t*>(&keys[i]), kBlockSize);
     if (0 != AES_set_encrypt_key(reinterpret_cast<uint8_t*>(&keys[i]),
                                  8 * kBlockSize, &expanded_keys[i])) {
       return mpc_utils::InternalError(ERR_reason_error_string(ERR_get_error()));

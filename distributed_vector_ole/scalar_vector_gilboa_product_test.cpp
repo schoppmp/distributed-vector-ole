@@ -15,11 +15,11 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
-#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
 #include "absl/memory/memory.h"
+#include "distributed_vector_ole/gf128.h"
 #include "gtest/gtest.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_matchers.h"
@@ -61,12 +61,11 @@ class ScalarVectorGilboaProductTest : public ::testing::Test {
 
     NTLContext<T> ntl_context;
     ntl_context.save();
-    std::thread thread1(
-        [this, &x, &v, &output_0, &ntl_context] {
-          ntl_context.restore();
-          ASSERT_OK_AND_ASSIGN(
-              output_0, scalar_vector_gilboa_0_->RunVectorProvider<T>(v));
-        });
+    std::thread thread1([this, &x, &v, &output_0, &ntl_context] {
+      ntl_context.restore();
+      ASSERT_OK_AND_ASSIGN(output_0,
+                           scalar_vector_gilboa_0_->RunVectorProvider<T>(v));
+    });
     ASSERT_OK_AND_ASSIGN(output_1,
                          scalar_vector_gilboa_1_->RunValueProvider(x, size));
     thread1.join();
@@ -129,8 +128,7 @@ TYPED_TEST(ScalarVectorGilboaProductTest, TestConversions) {
   NTL::zz_p::init(NTL::conv<int64_t>("4294967291"));
   for (const auto &value : values) {
     for (const auto &multiplier : values) {
-      std::vector<TypeParam> v(16 / gilboa_internal::SizeOf<TypeParam>(),
-                               value);
+      std::vector<TypeParam> v(16 / ScalarHelper<TypeParam>::SizeOf(), value);
       emp::block b = gilboa_internal::SpanToEMPBlock<TypeParam>(v, multiplier);
       std::vector<TypeParam> v2 =
           gilboa_internal::EMPBlockToVector<TypeParam>(b);
@@ -169,6 +167,14 @@ TYPED_TEST(ScalarVectorGilboaProductTest, TestDifferentLengths) {
       {TypeParam(0)}, absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`y` and `output` must have the same size");
+}
+
+TYPED_TEST(ScalarVectorGilboaProductTest, TestNegativeStatisticalSecurity) {
+  auto status =
+      ScalarVectorGilboaProduct::Create(this->helper_.GetChannel(0), -1.0);
+  ASSERT_FALSE(status.ok());
+  EXPECT_EQ(status.status().message(),
+            "`statistical_security` must not be negative.");
 }
 
 TEST(ScalarVectorGilboaProduct, TestNullChannel) {

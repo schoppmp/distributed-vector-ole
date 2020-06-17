@@ -20,20 +20,28 @@
 namespace distributed_vector_ole {
 
 ScalarVectorGilboaProduct::ScalarVectorGilboaProduct(
-    std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter)
+    std::unique_ptr<mpc_utils::CommChannelEMPAdapter> channel_adapter,
+    double statistical_security)
     : channel_adapter_(std::move(channel_adapter)),
-      ot_(channel_adapter_.get()) {}
+      ot_(channel_adapter_.get()),
+      statistical_security_(statistical_security) {}
 
 mpc_utils::StatusOr<std::unique_ptr<ScalarVectorGilboaProduct>>
-ScalarVectorGilboaProduct::Create(mpc_utils::comm_channel* channel) {
+ScalarVectorGilboaProduct::Create(mpc_utils::comm_channel* channel,
+                                  double statistical_security) {
   if (!channel) {
     return mpc_utils::InvalidArgumentError("`channel` must not be NULL");
+  }
+  if (statistical_security < 0) {
+    return mpc_utils::InvalidArgumentError(
+        "`statistical_security` must not be negative.");
   }
   // Create EMP adapter. Use a direct connection if channel is not measured.
   channel->sync();
   ASSIGN_OR_RETURN(auto adapter, mpc_utils::CommChannelEMPAdapter::Create(
                                      channel, !channel->is_measured()));
-  return absl::WrapUnique(new ScalarVectorGilboaProduct(std::move(adapter)));
+  return absl::WrapUnique(
+      new ScalarVectorGilboaProduct(std::move(adapter), statistical_security));
 }
 
 }  // namespace distributed_vector_ole

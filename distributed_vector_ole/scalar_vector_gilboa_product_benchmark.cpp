@@ -16,8 +16,8 @@
 
 #include "NTL/ZZ_p.h"
 #include "benchmark/benchmark.h"
-#include "distributed_vector_ole/scalar_vector_gilboa_product.h"
 #include "distributed_vector_ole/gf128.h"
+#include "distributed_vector_ole/scalar_vector_gilboa_product.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {

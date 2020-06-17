@@ -22,151 +22,229 @@
 // protocols.
 
 #include <omp.h>
+#include <algorithm>
 #include <vector>
 #include "NTL/ZZ.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "mpc_utils/canonical_errors.h"
+#include "mpc_utils/status_macros.h"
 #include "mpc_utils/statusor.h"
-#include "openssl/sha.h"
+#include "openssl/aes.h"
 
 namespace distributed_vector_ole {
 
-// UpdateHash needs to be implemented for each type that should be hashed using
-// CuckooHasher. Here we provide default implementations for integer types and
-// string_views.
-template <typename T, typename std::enable_if<
-                          std::numeric_limits<T>::is_integer, int>::type = 0>
-void UpdateHash(const T& input, SHA256_CTX* ctx) {
-  SHA256_Update(ctx, &input, sizeof(input));
-}
-
-inline void UpdateHash(absl::string_view input, SHA256_CTX* ctx) {
-  SHA256_Update(ctx, input.data(), input.size());
-}
-
 class CuckooHasher {
  public:
+  static const int kDefaultHashFunctions = 3;
   // Creates a new hasher with `num_hash_functions` hash functions, using the
   // passed `seed`.
   //
   // Returns INVALID_ARGUMENT if `num_hash_functions` is not postive.
   static mpc_utils::StatusOr<std::unique_ptr<CuckooHasher>> Create(
-      absl::string_view seed, int num_hash_functions = 3);
+      absl::uint128 seed, int num_hash_functions = kDefaultHashFunctions,
+      double statistical_security = 40);
+
+  // Hashes the input with each of the hash functions. Returns a vector that
+  // contains for each element the indices of the buckets assigned to it.
+  //
+  // Returns INVALID_ARGUMENT if `num_buckets` is not  positive.
+  template <typename T, int compiled_num_hash_functions = kDefaultHashFunctions>
+  mpc_utils::StatusOr<
+      std::vector<absl::InlinedVector<int64_t, compiled_num_hash_functions>>>
+  Hash(absl::Span<const T> inputs, int64_t num_buckets);
 
   // Hashes the inputs to `num_buckets` buckets using all hash functions created
-  // at construction. Returns the vector of buckets, containing copies of the
-  // original elements.
+  // at construction. Returns the vector of buckets, containing indices into
+  // `inputs`.
   //
   // Returns INVALID_ARGUMENT if `num_buckets` is not  positive.
   template <typename T>
-  mpc_utils::StatusOr<std::vector<std::vector<T>>> HashSimple(
-      absl::Span<const T> inputs, int64_t num_buckets) {
-    if (num_buckets <= 0) {
-      return mpc_utils::InvalidArgumentError("`num_buckets` must be positive");
-    }
-    std::vector<std::vector<T>> result(num_buckets);
-#pragma omp parallel
-    {
-      // Split the input interval into evenly-sized chunks and assign one to
-      // each thread. schedule(static) is needed to ensure the result can be
-      // merged in order (see below).
-      std::vector<std::vector<T>> thread_result(num_buckets);
-#pragma omp for schedule(static) nowait
-      for (int64_t i = 0; i < static_cast<int64_t>(inputs.size()); i++) {
-        for (int j = 0; j < static_cast<int>(hash_states_.size()); j++) {
-          thread_result[Hash(inputs[i], num_buckets, j)].push_back(inputs[i]);
-        }
-      }
-      // Have each thread append their buckets to the result, ensuring the order
-      // remains deterministic.
-      // See also: https://stackoverflow.com/a/18671256
-#pragma omp for schedule(static) ordered
-      for (int thread = 0; thread < omp_get_num_threads(); thread++) {
-#pragma omp ordered
-        for (int64_t i = 0; i < num_buckets; i++) {
-          result[i].insert(result[i].end(), thread_result[i].begin(),
-                           thread_result[i].end());
-        }
-      }
-    }
-    return result;
-  }
+  mpc_utils::StatusOr<std::vector<std::vector<int64_t>>> HashSimple(
+      absl::Span<const T> inputs, int64_t num_buckets);
 
   // Hashes the inputs to `num_buckets` buckets using Cuckoo Hashing.
+  // Returns a vector of indices into `inputs`, or -1 in positions that no input
+  // get mapped to.
   //
   // Returns INVALID_ARGUMENT if `num_buckets` is not  positive or
   // `inputs.size()` is larger than `num_buckets`.
   // Returns INTERNAL if insertion fails after trying to insert an element
   // `inputs.size()` times.
-  template <typename K, typename V>
-  mpc_utils::StatusOr<std::vector<absl::optional<std::pair<K, V>>>> HashCuckoo(
-      absl::Span<const K> keys, absl::Span<const V> values,
-      int64_t num_buckets) {
-    if (hash_states_.size() == 1) {
-      return mpc_utils::InvalidArgumentError(
-          "`HashCuckoo` can only be called when at least 2 hash functions were "
-          "specified at construction");
-    }
-    if (num_buckets <= 0) {
-      return mpc_utils::InvalidArgumentError("`num_buckets` must be positive");
-    }
-    if (static_cast<int64_t>(keys.size()) > num_buckets) {
-      return mpc_utils::InvalidArgumentError(
-          "`ìnputs.size()` must not be larger than `num_buckets`");
-    }
-    std::vector<absl::optional<std::pair<K, V>>> result(num_buckets);
-    std::vector<int> next_hash_function(num_buckets, 0);
-    int64_t num_tries = keys.size();
+  template <typename T>
+  mpc_utils::StatusOr<std::vector<int64_t>> HashCuckoo(
+      absl::Span<const T> inputs, int64_t num_buckets);
 
-    // Insert inputs one by one.
-    for (int i = 0; i < static_cast<int>(keys.size()); i++) {
-      std::pair<K, V> current_element =
-          std::make_pair(std::move(keys[i]), std::move(values[i]));
-      int current_hash_function = 0;
-      for (int64_t tries = 0; tries < num_tries + 1; tries++) {
-        if (tries == num_tries) {
-          return mpc_utils::InternalError(
-              "Failed to insert element, maximum number of tries exhausted");
-        }
-        int64_t index =
-            Hash(current_element.first, num_buckets, current_hash_function);
-        if (!result[index]) {
-          // Bucket empty -> simply insert.
-          result[index] = std::move(current_element);
-          break;
-        } else {
-          // Bucket full -> evict element and increment hash function counter.
-          std::swap(current_element, *result[index]);
-          std::swap(current_hash_function, next_hash_function[index]);
-          next_hash_function[index] =
-              (next_hash_function[index] + 1) % hash_states_.size();
-        }
-      }
-    }
-    return result;
-  }
+  // Returns the number of buckets necessary such that inserting `num_inputs`
+  // inputs fails with probability at most 2**(-statistical_security_). The
+  // parameters for this function have been chosen experimentally as described
+  // in this paper: https://eprint.iacr.org/2018/579.pdf
+  //
+  // Returns UNIMPLEMENTED if the number of hash functions is not 2 or 3.
+  // Returns INVALID_ARGUMENT if num_inputs is negative.
+  mpc_utils::StatusOr<int64_t> GetOptimalNumberOfBuckets(int64_t num_inputs);
 
  private:
-  explicit CuckooHasher(std::vector<SHA256_CTX> hash_states);
+  explicit CuckooHasher(AES_KEY expanded_seed, int num_hash_functions,
+                        double statistical_security);
 
-  // Hashes `input` to an index less than `n` using hash function number `i`.
+  // Hashes `input` to a uint128.
   template <typename T>
-  int64_t Hash(const T& input, int64_t num_buckets, int hash_function_index) {
-    SHA256_CTX state = hash_states_[hash_function_index];
-    UpdateHash(input, &state);
-    std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
-    SHA256_Final(digest.data(), &state);
-    // TODO: Ensure all positions are chosen with exactly equal probability.
-    NTL::ZZ digest_ntl;
-    NTL::ZZFromBytes(digest_ntl, digest.data(), digest.size());
-    return NTL::conv<uint64_t>(digest_ntl % num_buckets);
+  absl::uint128 HashToUint128(const T &in);
+
+  // Gets the value of the `i`-th hash function to [num_buckets] from the given
+  // 128-bit hash.
+  int64_t HashToBucket(absl::uint128 hash, int64_t num_buckets,
+                       int hash_function);
+
+  AES_KEY expanded_seed_;
+  int num_hash_functions_;
+  double statistical_security_;
+};
+
+template <typename T, int compiled_num_hash_functions>
+mpc_utils::StatusOr<
+    std::vector<absl::InlinedVector<int64_t, compiled_num_hash_functions>>>
+CuckooHasher::Hash(absl::Span<const T> inputs, int64_t num_buckets) {
+  if (num_buckets <= 0) {
+    return mpc_utils::InvalidArgumentError("`num_buckets` must be positive");
+  }
+  std::vector<absl::InlinedVector<int64_t, compiled_num_hash_functions>> result(
+      inputs.size(), absl::InlinedVector<int64_t, compiled_num_hash_functions>(
+                         num_hash_functions_));
+#pragma omp parallel for schedule(static)
+  for (int64_t i = 0; i < static_cast<int64_t>(inputs.size()); i++) {
+    absl::uint128 current_hash = HashToUint128(inputs[i]);
+    for (int j = 0; j < num_hash_functions_; j++) {
+      result[i][j] = HashToBucket(current_hash, num_buckets, j);
+    }
+  }
+  return result;
+}
+
+template <typename T>
+mpc_utils::StatusOr<std::vector<std::vector<int64_t>>> CuckooHasher::HashSimple(
+    absl::Span<const T> inputs, int64_t num_buckets) {
+  if (num_buckets <= 0) {
+    return mpc_utils::InvalidArgumentError("`num_buckets` must be positive");
+  }
+  double bits_needed = statistical_security_ + std::log2(inputs.size()) +
+                       std::log2(num_hash_functions_) + std::log2(num_buckets);
+  if (bits_needed > 128) {
+    return mpc_utils::InvalidArgumentError(absl::StrCat(
+        "The given sizes would require ", bits_needed,
+        "-bit hashes for the desired statistical security of ",
+        statistical_security_,
+        " bits. The current hash function only supports 128 bits"));
+  }
+  ASSIGN_OR_RETURN(auto hashes, Hash(inputs, num_buckets));
+  std::vector<std::vector<int64_t>> result(num_buckets);
+#pragma omp parallel
+  {
+    // Split the input interval into evenly-sized chunks and assign one to
+    // each thread. schedule(static) is needed to ensure the result can be
+    // merged in order (see below).
+    std::vector<std::vector<int64_t>> thread_result(num_buckets);
+#pragma omp for schedule(static) nowait
+    for (int64_t i = 0; i < static_cast<int64_t>(inputs.size()); i++) {
+      for (int j = 0; j < num_hash_functions_; j++) {
+        thread_result[hashes[i][j]].push_back(i);
+      }
+    }
+    // Have each thread append their buckets to the result, ensuring the order
+    // remains deterministic.
+    // See also: https://stackoverflow.com/a/18671256
+#pragma omp for schedule(static) ordered
+    for (int thread = 0; thread < omp_get_num_threads(); thread++) {
+#pragma omp ordered
+      for (int64_t i = 0; i < num_buckets; i++) {
+        result[i].insert(result[i].end(), thread_result[i].begin(),
+                         thread_result[i].end());
+      }
+    }
+  }
+  return result;
+}
+
+template <typename T>
+mpc_utils::StatusOr<std::vector<int64_t>> CuckooHasher::HashCuckoo(
+    absl::Span<const T> inputs, int64_t num_buckets) {
+  if (num_hash_functions_ == 1) {
+    return mpc_utils::InvalidArgumentError(
+        "`HashCuckoo` can only be called when at least 2 hash functions were "
+        "specified at construction");
+  }
+  if (num_buckets <= 0) {
+    return mpc_utils::InvalidArgumentError("`num_buckets` must be positive");
+  }
+  if (static_cast<int64_t>(inputs.size()) > num_buckets) {
+    return mpc_utils::InvalidArgumentError(
+        "`inputs.size()` must not be larger than `num_buckets`");
+  }
+  double bits_needed = statistical_security_ + std::log2(inputs.size()) +
+                       std::log2(num_hash_functions_) + std::log2(num_buckets);
+  if (bits_needed > 128) {
+    return mpc_utils::InvalidArgumentError(absl::StrCat(
+        "The given sizes would require ", bits_needed,
+        "-bit hashes for the desired statistical security of ",
+        statistical_security_,
+        " bits. The current hash function only supports 128 bits"));
+  }
+  std::vector<int64_t> buckets(num_buckets, -1);
+  std::vector<int> next_hash_function(num_buckets, 0);
+  int64_t num_tries = inputs.size();
+
+  // Hash all elements.
+  ASSIGN_OR_RETURN(auto hashes, Hash(inputs, num_buckets));
+
+  // Insert inputs one by one.
+  for (int64_t i = 0; i < static_cast<int64_t>(inputs.size()); i++) {
+    int64_t current_element = i;
+    int current_hash_function = 0;
+    for (int64_t tries = 0; tries < num_tries + 1; tries++) {
+      if (tries == num_tries) {
+        return mpc_utils::InternalError(
+            "Failed to insert element, maximum number of tries exhausted");
+      }
+      int64_t index = hashes[current_element][current_hash_function];
+      if (buckets[index] == -1) {
+        // Bucket empty -> simply insert.
+        buckets[index] = current_element;
+        break;
+      } else {
+        // Bucket full -> evict element and increment hash function counter.
+        std::swap(current_element, buckets[index]);
+        std::swap(current_hash_function, next_hash_function[index]);
+        next_hash_function[index] =
+            (next_hash_function[index] + 1) % num_hash_functions_;
+      }
+    }
   }
 
-  // One per hash function.
-  std::vector<SHA256_CTX> hash_states_;
-};
+  //  // Map buckets back to their corresponding key-value pairs.
+  //  std::vector<absl::optional<std::pair<K, V>>> result(num_buckets);
+  //  for (int64_t i = 0; i < num_buckets; i++) {
+  //    if (buckets[i] != -1) {
+  //      result[i] = std::make_pair(keys[buckets[i]], values[buckets[i]]);
+  //    }
+  //  }
+  return buckets;
+}
+
+// Works for any type that's convertible to absl::uint128.
+template <typename T>
+absl::uint128 CuckooHasher::HashToUint128(const T &in) {
+  absl::uint128 in128(in);
+  absl::uint128 result;
+  AES_encrypt(reinterpret_cast<const uint8_t *>(&in128),
+              reinterpret_cast<uint8_t *>(&result), &expanded_seed_);
+  result ^= in128;
+  return result;
+}
 
 }  // namespace distributed_vector_ole
 

@@ -15,23 +15,23 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/spfss_known_index.h"
-#include "distributed_vector_ole/internal/ntl_helpers.h"
-#include "distributed_vector_ole/gf128.h"
 #include <thread>
 #include <vector>
+#include "NTL/lzz_p.h"
 #include "absl/memory/memory.h"
 #include "boost/container/vector.hpp"
+#include "distributed_vector_ole/gf128.h"
+#include "distributed_vector_ole/internal/ntl_helpers.h"
 #include "gtest/gtest.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/status_matchers.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
-#include "NTL/lzz_p.h"
 
 namespace distributed_vector_ole {
 
 namespace {
 
-template<typename T>
+template <typename T>
 class SPFSSKnownIndexTest : public ::testing::Test {
  protected:
   SPFSSKnownIndexTest() : helper_(false) {}
@@ -96,26 +96,26 @@ TYPED_TEST(SPFSSKnownIndexTest, TestSmallVectors) {
     for (int index = 0; index < size; index++) {
       if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
         for (const auto &modulus : {
-            "340282366920938463463374607431768211456",  // 2^128 (the largest
-                                                        // modulus we
-                                                        // support)
-            // Prime moduli:
-            "340282366920938463463374607431768211297",  // 2^128 - 159
-            "18446744073709551557",                     // 2^64 - 59
-            "4294967291",                               // 2^32 - 5
-            "65521",                                    // 2^16 - 15
-            "251"                                       // 2^8 - 5
-        }) {
+                 "340282366920938463463374607431768211456",  // 2^128 (the
+                                                             // largest modulus
+                                                             // we support)
+                 // Prime moduli:
+                 "340282366920938463463374607431768211297",  // 2^128 - 159
+                 "18446744073709551557",                     // 2^64 - 59
+                 "4294967291",                               // 2^32 - 5
+                 "65521",                                    // 2^16 - 15
+                 "251"                                       // 2^8 - 5
+             }) {
           NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
           this->TestVector(size, index);
         }
       } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
         for (int64_t modulus : {
-            1125899906842597L,  // 2^50 - 27
-            4294967291L,        // 2^32 - 5
-            65521L,             // 2^16 - 15
-            251L                // 2^8 - 5
-        }) {
+                 1125899906842597L,  // 2^50 - 27
+                 4294967291L,        // 2^32 - 5
+                 65521L,             // 2^16 - 15
+                 251L                // 2^8 - 5
+             }) {
           NTL::zz_p::init(modulus);
           this->TestVector(size, index);
         }

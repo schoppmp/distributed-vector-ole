@@ -19,17 +19,11 @@
 
 // Helper functions for computing Gilboa products with arbitrary types.
 
-#include "NTL/ZZ_p.h"
-#include "NTL/lzz_p.h"
-#include "NTL/vec_ZZ_p.h"
-#include "NTL/vec_lzz_p.h"
 #include "absl/meta/type_traits.h"
 #include "absl/numeric/int128.h"
 #include "absl/types/span.h"
 #include "boost/container/vector.hpp"
-#include "distributed_vector_ole/internal/ntl_helpers.h"
-#include "distributed_vector_ole/internal/scalar_type_helpers.h"
-#include "distributed_vector_ole/gf128.h"
+#include "distributed_vector_ole/internal/scalar_helpers.h"
 #include "emp-ot/emp-ot.h"
 #include "mpc_utils/comm_channel.hpp"
 #include "mpc_utils/comm_channel_emp_adapter.hpp"
@@ -38,81 +32,29 @@
 namespace distributed_vector_ole {
 namespace gilboa_internal {
 
-// Returns the size (in bytes) of the type parameter or the argument.
-template<typename T, typename std::enable_if<
-    std::numeric_limits<T>::is_integer, int>::type = 0>
-constexpr int SizeOf() {
-  return sizeof(T);
-}
-template<typename T, typename std::enable_if<
-    std::is_same<T, gf128>::value, int>::type = 0>
-constexpr int SizeOf() {
-  return sizeof(T);
-}
-template<typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-int SizeOf() {
-  int num_bits = NTLNumBits<T>();
-  return (num_bits + 7) / 8;
-}
-
-// Returns the k-th bit of x.
-template<typename T, typename std::enable_if<
-    std::numeric_limits<T>::is_integer, int>::type = 0>
-bool GetBit(T x, int k) {
-  return ((x >> k) & T(1)) != 0 ? true : false;
-}
-template<typename T, typename std::enable_if<
-    std::is_same<T, gf128>::value, int>::type = 0>
-bool GetBit(T x, int k) {
-  return GetBit(ToUint128(x), k);
-}
-template<typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-bool GetBit(const T &x, int k) {
-  return NTL::bit(NTL::rep(x), k);
-}
-
 // Returns the bit decomposition of a type T value
-template<typename T>
+template <typename T>
 boost::container::vector<bool> GetBits(const T &x) {
-  boost::container::vector<bool> out(SizeOf<T>() * 8);
+  boost::container::vector<bool> out(ScalarHelper<T>::SizeOf() * 8);
   for (int i = 0; i < static_cast<int>(out.size()); ++i) {
-    out[i] = GetBit(x, i);
+    out[i] = ScalarHelper<T>::GetBit(x, i);
   }
   return out;
-}
-
-// Returns the j-th power of T(2).
-template<typename T, typename std::enable_if<
-    std::numeric_limits<T>::is_integer, int>::type = 0>
-T PowerOf2(int j) {
-  return T(1) << j;
-}
-template<typename T, typename std::enable_if<
-    std::is_same<T, gf128>::value, int>::type = 0>
-T PowerOf2(int j) {
-  return T(absl::uint128(1) << j);
-}
-template<typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-T PowerOf2(int j) {
-  return NTL::conv<T>(typename T::rep_type(1) << j);
 }
 
 // Conversion functions between EMP and Span<T>
 // These assume that the total size of the span is 128 bits,
 // and thus matches the size of an EMP block
-template<typename T>
+template <typename T>
 emp::block SpanToEMPBlock(absl::Span<const T> v, const T &multiplier = T(1)) {
   absl::uint128 packed = 0;
   T temp;  // Saves an allocation.
   for (int i = v.size() - 1; i >= 0; --i) {
     temp = v[i];
     temp *= multiplier;
-    packed |= ToUint128<T>(temp);
+    packed |= ScalarHelper<T>::ToUint128(temp);
     if (i > 0) {
-      packed <<= SizeOf<T>() * 8;
+      packed <<= ScalarHelper<T>::SizeOf() * 8;
     }
   }
   uint64_t low = absl::Uint128Low64(packed);
@@ -120,35 +62,42 @@ emp::block SpanToEMPBlock(absl::Span<const T> v, const T &multiplier = T(1)) {
   return emp::makeBlock(high, low);
 }
 
-template<typename T>
+template <typename T>
 void EMPBlockToSpan(emp::block b, absl::Span<T> out) {
-  int packing_factor = 16 / SizeOf<T>();  // emp::block are 128 bits
+  int packing_factor =
+      16 / ScalarHelper<T>::SizeOf();  // emp::block are 128 bits
   assert(packing_factor == static_cast<int>(out.size()));
   absl::uint128 packed = absl::MakeUint128(b[1], b[0]);
   for (int i = 0; i < packing_factor; ++i) {
-    FromUint128<T>(packed >> (i * SizeOf<T>() * 8), &out[i]);
+    // We pack elements as tightly as possible, and use
+    // ScalarHelper<T>::CanBeHashedInto() to figure out whether we can use
+    // correlated OT or have to use 1-out-of-2 OT (see RunOTSender below).
+    int num_bits = ScalarHelper<T>::SizeOf() * 8;
+    absl::uint128 current = packed >> (i * num_bits);
+    if (num_bits < 128) {
+      current %= (absl::uint128(1) << num_bits);
+    }
+    out[i] = ScalarHelper<T>::FromUint128(current);
   }
 }
 
-template<typename T>
+template <typename T>
 vector<T> EMPBlockToVector(emp::block b) {
-  int packing_factor = 16 / SizeOf<T>();  // emp::block are 128 bits
+  int packing_factor =
+      16 / ScalarHelper<T>::SizeOf();  // emp::block are 128 bits
   std::vector<T> out(packing_factor);
   EMPBlockToSpan(b, absl::MakeSpan(out));
   return out;
 }
 
-// Correlated OT for integers modulo 2^b.
-template<typename T, typename boost::enable_if_c<
-        std::numeric_limits<T>::is_integer ||
-        std::is_same<T, gf128>::value
-    , int>::type = 0>
-std::vector<emp::block> RunOTSender(
+// Correlated OT for integers that hash values can be directly mapped to.
+template <typename T>
+std::vector<emp::block> RunOTSenderCorrelated(
     absl::Span<const emp::block> deltas,
     emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
   std::vector<emp::block> opt0(deltas.size());
   NTL::Vec<T> d, m, res;
-  int packing_factor = 16 / SizeOf<T>();
+  int packing_factor = 16 / ScalarHelper<T>::SizeOf();
   d.SetLength(packing_factor);
   m.SetLength(packing_factor);
   res.SetLength(packing_factor);
@@ -164,10 +113,10 @@ std::vector<emp::block> RunOTSender(
   return opt0;
 }
 
-// 1-out-of-2-OT for NTL modular integers.
-template<typename T,
-    typename std::enable_if<is_modular_integer<T>::value, int>::type = 0>
-std::vector<emp::block> RunOTSender(
+// 1-out-of-2-OT for scalar types that cannot be directly converted from hash
+// values, such as NTL modular integers in most cases.
+template <typename T>
+std::vector<emp::block> RunOTSender1of2(
     absl::Span<const emp::block> deltas,
     emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
   // Generate random elements. Using NTL::random ensures that the elements are
@@ -176,13 +125,14 @@ std::vector<emp::block> RunOTSender(
   std::vector<emp::block> opt1(deltas.size());
   NTL::Vec<T> d, m, res;
   NTL::Vec<T> random_elements;
-  int packing_factor = 16 / SizeOf<T>();
+  int packing_factor = 16 / ScalarHelper<T>::SizeOf();
   d.SetLength(packing_factor);
   m.SetLength(packing_factor);
   res.SetLength(packing_factor);
   random_elements.SetLength(packing_factor);
   for (int i = 0; i < static_cast<int>(opt0.size()); ++i) {
-    NTL::random(random_elements, packing_factor);
+    ScalarHelper<T>::Randomize(
+        absl::MakeSpan(random_elements.data(), random_elements.length()));
     opt0[i] = SpanToEMPBlock(
         absl::MakeConstSpan(random_elements.data(), packing_factor));
     EMPBlockToSpan<T>(deltas[i], absl::MakeSpan(d.data(), d.length()));
@@ -194,20 +144,6 @@ std::vector<emp::block> RunOTSender(
   }
   ot->send(opt0.data(), opt1.data(), opt0.size());
   return opt0;
-}
-
-template<typename T>
-inline std::vector<emp::block> RunOTReceiver(
-    absl::Span<const bool> choices,
-    emp::SHOTExtension<mpc_utils::CommChannelEMPAdapter> *ot) {
-  std::vector<emp::block> result(choices.size());
-  bool use_correlated_ot = !is_modular_integer<T>::value;
-  if (use_correlated_ot) {
-    ot->recv_cot(result.data(), choices.data(), choices.size());
-  } else {
-    ot->recv(result.data(), choices.data(), choices.size());
-  }
-  return result;
 }
 
 }  // namespace gilboa_internal

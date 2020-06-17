@@ -41,6 +41,7 @@
 #include "absl/types/span.h"
 #include "mpc_utils/statusor.h"
 #include "openssl/aes.h"
+#include "openssl/rand.h"
 
 namespace distributed_vector_ole {
 
@@ -51,9 +52,19 @@ class GGMTree {
   using Block = absl::uint128;
   static_assert(sizeof(Block) == kBlockSize, "AES block size is not 128");
 
+  // Constructs a GGMTree from a single seed and the given AES keys.
+  static mpc_utils::StatusOr<std::unique_ptr<GGMTree>> Create(
+      int64_t num_leaves, Block seed, std::vector<Block> keys);
+
   // Constructs a GGMTree from a single seed.
   static mpc_utils::StatusOr<std::unique_ptr<GGMTree>> Create(
-      int arity, int64_t num_leaves, Block seed);
+      int arity, int64_t num_leaves, Block seed) {
+    std::vector<Block> keys(arity);
+    for (int i = 0; i < arity; i++) {
+      RAND_bytes(reinterpret_cast<uint8_t *>(&keys[i]), kBlockSize);
+    }
+    return Create(num_leaves, seed, std::move(keys));
+  }
 
   // Constructs a GGMTree that is missing a single leaf value.
   // For each level, `sibling_wise_xors` contains a vector of blocks with size

@@ -1,8 +1,9 @@
 // Based on the following GF128 implementation in libiop:
 // https://github.com/scipr-lab/libiop/blob/45d5f219a784a88d6fc4557b2bf69107264a24d1/libiop/algebra/fields/gf128.hpp
 //
-// Copyright 2019 the libiop authors (https://github.com/scipr-lab/libiop/blob/master/AUTHORS),
-// licensed under the MIT license.
+// Copyright 2019 the libiop authors
+// (https://github.com/scipr-lab/libiop/blob/master/AUTHORS), licensed under the
+// MIT license.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,8 +28,8 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 #include <ostream>
+#include <vector>
 #include "absl/numeric/int128.h"
 #include "boost/serialization/base_object.hpp"
 
@@ -38,6 +39,7 @@ namespace distributed_vector_ole {
 // Elements are represented internally with two uint64s.
 class gf128 {
   friend class boost::serialization::access;
+
  public:
   // x^128 + x^7 + x^2 + x + 1
   static const constexpr uint64_t modulus_ = 0b10000111;
@@ -79,21 +81,30 @@ class gf128 {
 
   static gf128 zero();
   static gf128 one();
-  static gf128 multiplicative_generator; // generator of gf128^*.
+  static gf128 multiplicative_generator;  // generator of gf128^*.
 
   static std::size_t extension_degree() { return 128; }
 
-  template<class Archive>
+  // Support for boost::serialization.
+  template <class Archive>
   void serialize(Archive &ar, const unsigned int version) {
-    ar & value_;
+    ar &value_;
   }
+
+  // Support for absl::Hash.
+  template <typename H>
+  friend H AbslHashValue(H h, const gf128 &x) {
+    return H::combine(std::move(h), x.value_[1], x.value_[0]);
+  }
+
  private:
   uint64_t value_[2];  // Little endian.
 };
 
-} // namespace distributed_vector_ole
+}  // namespace distributed_vector_ole
 
 // Output operator for printing.
-std::ostream& operator<< (std::ostream& os, const distributed_vector_ole::gf128 x);
+std::ostream &operator<<(std::ostream &os,
+                         const distributed_vector_ole::gf128 x);
 
-#endif // DISTRIBUTED_VECTOR_OLE_GF128_H_
+#endif  // DISTRIBUTED_VECTOR_OLE_GF128_H_
