@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/all_but_one_random_ot.h"
+
 #include <thread>
+
 #include "NTL/lzz_p.h"
 #include "absl/memory/memory.h"
 #include "distributed_vector_ole/internal/ntl_helpers.h"

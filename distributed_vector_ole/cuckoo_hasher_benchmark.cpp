@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <numeric>
+
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/cuckoo_hasher.h"
 

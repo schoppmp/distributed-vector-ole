@@ -21,6 +21,7 @@
 // THE SOFTWARE.
 
 #include "distributed_vector_ole/gf128.h"
+
 #include "gtest/gtest.h"
 
 namespace distributed_vector_ole {

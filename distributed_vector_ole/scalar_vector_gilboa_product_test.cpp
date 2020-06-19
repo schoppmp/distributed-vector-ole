@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
+
 #include <thread>
+
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
 #include "absl/memory/memory.h"

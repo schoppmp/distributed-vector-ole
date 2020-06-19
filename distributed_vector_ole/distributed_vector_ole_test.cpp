@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/distributed_vector_ole.h"
+
 #include <thread>
+
 #include "absl/memory/memory.h"
 #include "distributed_vector_ole/gf128.h"
 #include "gtest/gtest.h"

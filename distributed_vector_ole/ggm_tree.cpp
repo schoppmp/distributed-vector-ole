@@ -15,11 +15,14 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "ggm_tree.h"
+
 #include <omp.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <functional>
+
 #include "absl/memory/memory.h"
 #include "absl/types/span.h"
 #include "mpc_utils/canonical_errors.h"
@@ -28,8 +31,6 @@
 #include "mpc_utils/statusor.h"
 #include "openssl/err.h"
 #include "openssl/rand.h"
-
-#pragma omp declare reduction(^: absl::uint128: omp_out ^= omp_in) initializer (omp_priv = 0)
 
 namespace distributed_vector_ole {
 
@@ -68,7 +69,6 @@ void XORBlocks(absl::Span<const GGMTree::Block> in,
 
   // Use threads for the outer loop over batches.
   int64_t num_batches = (in.size() + batch_size - 1) / batch_size;
-#pragma omp parallel for reduction(^ : out_data[:batch_size]) schedule(guided)
   for (int64_t batch = 0; batch < num_batches; batch++) {
     int64_t num_blocks = std::min(
         batch_size, static_cast<int64_t>(in.size()) - batch * batch_size);
@@ -210,7 +210,6 @@ void GGMTree::ExpandSubtree(int start_level, int64_t start_node) {
     // Account for the fact that the level might not be full.
     max_node_index = std::min(max_node_index, level_size(level_index));
 
-#pragma omp parallel for schedule(guided)
     for (int64_t node_index = start_node; node_index < max_node_index;
          node_index++) {
       int64_t num_siblings =

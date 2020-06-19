@@ -15,8 +15,10 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/spfss_known_index.h"
+
 #include <thread>
 #include <vector>
+
 #include "NTL/lzz_p.h"
 #include "absl/memory/memory.h"
 #include "boost/container/vector.hpp"

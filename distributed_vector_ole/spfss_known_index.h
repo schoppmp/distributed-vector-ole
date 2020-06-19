@@ -54,10 +54,12 @@ class SPFSSKnownIndex {
   // array of pre-allocated Ts.
   template <typename T>
   mpc_utils::Status RunValueProvider(T val_share, absl::Span<T> output) {
-    return RunValueProviderBatched(absl::MakeConstSpan(&val_share, 1), absl::MakeSpan(&output, 1));
+    return RunValueProviderBatched(absl::MakeConstSpan(&val_share, 1),
+                                   absl::MakeSpan(&output, 1));
   }
   template <typename T>
-  mpc_utils::StatusOr<std::vector<T>> RunValueProvider(T val_share, int64_t size) {
+  mpc_utils::StatusOr<std::vector<T>> RunValueProvider(T val_share,
+                                                       int64_t size) {
     std::vector<T> output(size);
     RETURN_IF_ERROR(RunValueProvider<T>(val_share, absl::MakeSpan(output)));
     return output;
@@ -70,14 +72,19 @@ class SPFSSKnownIndex {
   // array of pre-allocated Ts, and `ìndex` must be between 0 and output.size()
   // - 1.
   template <typename T>
-  mpc_utils::Status RunIndexProvider(T val_share, int64_t index, absl::Span<T> output) {
+  mpc_utils::Status RunIndexProvider(T val_share, int64_t index,
+                                     absl::Span<T> output) {
     return RunIndexProviderBatched(absl::MakeConstSpan(&val_share, 1),
-                                   absl::MakeConstSpan(&index, 1), absl::MakeSpan(&output, 1));
+                                   absl::MakeConstSpan(&index, 1),
+                                   absl::MakeSpan(&output, 1));
   }
   template <typename T>
-  mpc_utils::StatusOr<std::vector<T>> RunIndexProvider(T val_share, int64_t index, int64_t size) {
+  mpc_utils::StatusOr<std::vector<T>> RunIndexProvider(T val_share,
+                                                       int64_t index,
+                                                       int64_t size) {
     std::vector<T> output(size);
-    RETURN_IF_ERROR(RunIndexProvider<T>(val_share, index, absl::MakeSpan(output)));
+    RETURN_IF_ERROR(
+        RunIndexProvider<T>(val_share, index, absl::MakeSpan(output)));
     return output;
   }
   template <typename T>
@@ -94,10 +101,11 @@ class SPFSSKnownIndex {
 };
 
 template <typename T>
-mpc_utils::Status SPFSSKnownIndex::RunValueProviderBatched(absl::Span<const T> val_shares,
-                                                           absl::Span<absl::Span<T>> outputs) {
+mpc_utils::Status SPFSSKnownIndex::RunValueProviderBatched(
+    absl::Span<const T> val_shares, absl::Span<absl::Span<T>> outputs) {
   if (val_shares.size() != outputs.size()) {
-    return mpc_utils::InvalidArgumentError("`val-shares` and `outputs` must have the same size");
+    return mpc_utils::InvalidArgumentError(
+        "`val-shares` and `outputs` must have the same size");
   }
   RETURN_IF_ERROR(all_but_one_rot_->RunSenderBatched(outputs));
   std::vector<T> sums(val_shares.begin(), val_shares.end());
@@ -105,17 +113,16 @@ mpc_utils::Status SPFSSKnownIndex::RunValueProviderBatched(absl::Span<const T> v
   int len = static_cast<int>(val_shares.size());
   NTLContext<T> context;
   context.save();
-#pragma omp parallel for schedule(static)
-  for (int j = 0; j < len; j++) {
 #pragma omp parallel
-    {
-      context.restore();
-#pragma omp for reduction(+ : sums_data[:len]) schedule(static)
+  {
+    context.restore();
+#pragma omp for schedule(guided)
+    for (int j = 0; j < len; j++) {
       for (int64_t i = 0; i < static_cast<int64_t>(outputs[j].size()); ++i) {
         sums_data[j] += outputs[j][i];
         outputs[j][i] = -outputs[j][i];
       }
-    };
+    }
   }
   channel_->send(sums);
   channel_->flush();
@@ -123,10 +130,11 @@ mpc_utils::Status SPFSSKnownIndex::RunValueProviderBatched(absl::Span<const T> v
 }
 
 template <typename T>
-mpc_utils::Status SPFSSKnownIndex::RunIndexProviderBatched(absl::Span<const T> val_shares,
-                                                           absl::Span<const int64_t> indices,
-                                                           absl::Span<absl::Span<T>> outputs) {
-  if (val_shares.size() != outputs.size() || val_shares.size() != indices.size()) {
+mpc_utils::Status SPFSSKnownIndex::RunIndexProviderBatched(
+    absl::Span<const T> val_shares, absl::Span<const int64_t> indices,
+    absl::Span<absl::Span<T>> outputs) {
+  if (val_shares.size() != outputs.size() ||
+      val_shares.size() != indices.size()) {
     return mpc_utils::InvalidArgumentError(
         "`val-shares`, `indices`, and `outputs` must have the same size");
   }
@@ -137,18 +145,17 @@ mpc_utils::Status SPFSSKnownIndex::RunIndexProviderBatched(absl::Span<const T> v
   int len = static_cast<int>(val_shares.size());
   NTLContext<T> context;
   context.save();
-#pragma omp parallel for schedule(static)
-  for (int j = 0; j < len; j++) {
 #pragma omp parallel
-    {
-      context.restore();
-#pragma omp for reduction(+ : sums_data[:len]) schedule(static)
+  {
+    context.restore();
+#pragma omp for schedule(guided)
+    for (int j = 0; j < len; j++) {
       for (int64_t i = 0; i < static_cast<int64_t>(outputs[j].size()); ++i) {
         if (i != indices[j]) {
           sums_data[j] -= outputs[j][i];
         }
       }
-    };
+    }
   }
   channel_->recv(sums_server);
   for (int j = 0; j < len; j++) {

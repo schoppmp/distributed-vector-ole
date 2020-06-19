@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
+
 #include "mpc_utils/status_macros.h"
 
 namespace distributed_vector_ole {

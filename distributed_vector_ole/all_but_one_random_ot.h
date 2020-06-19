@@ -22,6 +22,7 @@
 // except for the ith position, for which the receiver obtains nothing.
 
 #include <vector>
+
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "distributed_vector_ole/ggm_tree.h"
@@ -76,7 +77,7 @@ class AllButOneRandomOT {
 #pragma omp parallel
     {
       context.restore();
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
       for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
         if (outputs[i].size() == 0) {
           continue;  // Do nothing if output array is empty.
@@ -113,7 +114,7 @@ class AllButOneRandomOT {
 #pragma omp parallel
     {
       context.restore();
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
       for (int i = 0; i < static_cast<int>(outputs.size()); i++) {
         if (outputs[i].size() == 0) {
           continue;  // Do nothing if output array is empty.
@@ -175,19 +176,31 @@ AllButOneRandomOT::SendTrees(absl::Span<const int64_t> num_leaves, int arity) {
   for (int i = 0; i < arity; i++) {
     RAND_bytes(reinterpret_cast<uint8_t *>(&keys[i]), GGMTree::kBlockSize);
   }
+
+  // Create GGMTrees in parallel.
+  std::vector<mpc_utils::StatusOr<std::unique_ptr<GGMTree>>> status_or_trees(
+      num_trees);
+#pragma omp parallel for schedule(guided)
+  for (int i = 0; i < num_trees; i++) {
+    if (num_leaves[i] == 0) {
+      continue;
+    }
+    // Create tree from random seed.
+    GGMTree::Block seed;
+    RAND_bytes(reinterpret_cast<unsigned char *>(&seed), sizeof(seed));
+    status_or_trees[i] = GGMTree::Create(num_leaves[i], seed, keys);
+  }
+
+  // Prepare OT messages from sibling-wise XORs. For each level of each tree,
+  // the receiver will choose either the XOR of the left or of the right
+  // children.
   for (int i = 0; i < num_trees; i++) {
     if (num_leaves[i] == 0) {
       offsets[i + 1] = offsets[i];
       continue;
     }
-
-    // Create tree from random seed.
-    GGMTree::Block seed;
-    RAND_bytes(reinterpret_cast<unsigned char *>(&seed), sizeof(seed));
-    ASSIGN_OR_RETURN(trees[i], GGMTree::Create(num_leaves[i], seed, keys));
-
+    ASSIGN_OR_RETURN(trees[i], std::move(status_or_trees[i]));
     offsets[i + 1] = offsets[i] + trees[i]->num_levels() - 1;
-    assert(offsets[i + 1] >= offsets[i]);
 
     auto xors = trees[i]->GetSiblingWiseXOR();
     opt0.resize(offsets[i + 1]);

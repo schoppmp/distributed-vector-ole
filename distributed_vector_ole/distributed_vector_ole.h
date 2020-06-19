@@ -22,6 +22,7 @@
 // vector w and a scalar x, such that ux + v = w.
 
 #include <random>
+
 #include "Eigen/Sparse"
 #include "distributed_vector_ole/aes_uniform_bit_generator.h"
 #include "distributed_vector_ole/internal/scalar_helpers.h"

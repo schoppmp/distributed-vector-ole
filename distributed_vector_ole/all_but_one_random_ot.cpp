@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/all_but_one_random_ot.h"
+
 #include "absl/memory/memory.h"
 #include "boost/container/vector.hpp"
 
@@ -99,7 +100,7 @@ AllButOneRandomOT::ReceiveTrees(absl::Span<const int64_t> num_leaves,
 
   mpc_utils::Status status = mpc_utils::OkStatus();
   std::vector<std::unique_ptr<GGMTree>> trees(num_trees);
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(guided)
   for (int i = 0; i < num_trees; i++) {
     if (num_leaves[i] == 0) {
       continue;

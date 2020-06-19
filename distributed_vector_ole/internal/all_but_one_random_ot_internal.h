@@ -18,6 +18,7 @@
 #define DISTRIBUTED_VECTOR_OLE_INTERNAL_ALL_BUT_ONE_RANDOM_OT_INTERNAL_H
 
 #include <type_traits>
+
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
 #include "absl/meta/type_traits.h"
@@ -41,19 +42,11 @@ namespace all_but_one_random_ot_internal {
 //   This will require an (n-1)-out-of-n-OT on the last level.
 template <typename T>
 void UnpackLastLevel(const GGMTree &tree, absl::Span<T> output) {
-  // Save NTL context and restore it in each OMP thread.
-  NTLContext<T> context;
-  context.save();
-#pragma omp parallel
-  {
-    context.restore();
-#pragma omp for schedule(static)
-    for (int64_t i = 0; i < tree.num_leaves(); ++i) {
-      // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
-      GGMTree::Block leaf = tree.GetValueAtLeaf(i).ValueOrDie();
-      output[i] = ScalarHelper<T>::FromUint128(leaf);
-    }
-  };
+  for (int64_t i = 0; i < tree.num_leaves(); ++i) {
+    // ValieOrDie() is okay here as long as i stays in [0, num_leaves).
+    GGMTree::Block leaf = tree.GetValueAtLeaf(i).ValueOrDie();
+    output[i] = ScalarHelper<T>::FromUint128(leaf);
+  }
 }
 
 // Conversion functions between EMP and GGMTree blocks.

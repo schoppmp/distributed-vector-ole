@@ -32,6 +32,7 @@
 // of a vector `y` held by the sender, and a scalar `x` held by the receiver.
 
 #include <algorithm>
+
 #include "NTL/ZZ_p.h"
 #include "absl/container/flat_hash_set.h"
 #include "distributed_vector_ole/cuckoo_hasher.h"
@@ -213,25 +214,33 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
   std::vector<std::vector<T>> bucket_outputs(num_buckets);
   std::vector<absl::Span<T>> bucket_output_spans(num_buckets);
   std::vector<int64_t> index_in_bucket(num_buckets, 0);
-  for (int i = 0; i < num_buckets; i++) {
-    if (buckets_[i].empty()) {
-      continue;
-    }
-    bucket_outputs[i] = std::vector<T>(buckets_[i].size(), T(0));
-    bucket_output_spans[i] = absl::MakeSpan(bucket_outputs[i]);
-    if (hashed_inputs[i] != -1) {
-      // Find the index in the bucket. We can assume the bucket is sorted,
-      // as it is created in ascending order in UpdateBuckets, and
-      // HashSimple preserves the order.
-      index_in_bucket[i] =
-          std::lower_bound(buckets_[i].begin(), buckets_[i].end(),
-                           indices[hashed_inputs[i]]) -
-          buckets_[i].begin();
+  NTLContext<T> context;
+  context.save();
+#pragma omp parallel
+  {
+    context.restore();
+#pragma omp for schedule(guided)
+    for (int i = 0; i < num_buckets; i++) {
+      context.restore();
+      if (buckets_[i].empty()) {
+        continue;
+      }
+      bucket_outputs[i] = std::vector<T>(buckets_[i].size(), T(0));
+      bucket_output_spans[i] = absl::MakeSpan(bucket_outputs[i]);
+      if (hashed_inputs[i] != -1) {
+        // Find the index in the bucket. We can assume the bucket is sorted,
+        // as it is created in ascending order in UpdateBuckets, and
+        // HashSimple preserves the order.
+        index_in_bucket[i] =
+            std::lower_bound(buckets_[i].begin(), buckets_[i].end(),
+                             indices[hashed_inputs[i]]) -
+            buckets_[i].begin();
+      }
     }
   }
-  spfss_->RunIndexProviderBatched(absl::MakeConstSpan(val_share),
-                                  absl::MakeConstSpan(index_in_bucket),
-                                  absl::MakeSpan(bucket_output_spans));
+  RETURN_IF_ERROR(spfss_->RunIndexProviderBatched(
+      absl::MakeConstSpan(val_share), absl::MakeConstSpan(index_in_bucket),
+      absl::MakeSpan(bucket_output_spans)));
   for (int i = 0; i < num_buckets; i++) {
     for (int j = 0; j < static_cast<int>(buckets_[i].size()); j++) {
       output[buckets_[i][j]] += bucket_outputs[i][j];

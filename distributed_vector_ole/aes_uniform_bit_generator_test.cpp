@@ -1,5 +1,7 @@
 #include "distributed_vector_ole/aes_uniform_bit_generator.h"
+
 #include <random>
+
 #include "gtest/gtest.h"
 #include "openssl/rand.h"
 
