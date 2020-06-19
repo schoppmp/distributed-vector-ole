@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/ggm_tree.h"
+
 #include <cmath>
+
 #include "gtest/gtest.h"
 #include "mpc_utils/status_macros.h"
 #include "mpc_utils/status_matchers.h"

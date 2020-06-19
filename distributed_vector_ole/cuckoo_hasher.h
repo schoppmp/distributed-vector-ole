@@ -22,8 +22,10 @@
 // protocols.
 
 #include <omp.h>
+
 #include <algorithm>
 #include <vector>
+
 #include "NTL/ZZ.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/numeric/int128.h"

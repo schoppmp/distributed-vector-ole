@@ -23,6 +23,7 @@
 // - NTLTemp<T>() to get a temporary variable
 
 #include <type_traits>
+
 #include "NTL/ZZ_p.h"
 #include "NTL/lzz_p.h"
 #include "absl/meta/type_traits.h"

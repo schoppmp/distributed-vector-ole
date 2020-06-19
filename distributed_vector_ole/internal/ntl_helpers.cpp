@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/internal/ntl_helpers.h"
+
 #include "NTL/ZZ_p.h"
 #include "absl/types/optional.h"
 

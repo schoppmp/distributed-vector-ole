@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "openssl/rand.h"
-
 #include "distributed_vector_ole/gf128.h"
+
+#include "openssl/rand.h"
 
 #ifdef USE_ASM
 #include <emmintrin.h>

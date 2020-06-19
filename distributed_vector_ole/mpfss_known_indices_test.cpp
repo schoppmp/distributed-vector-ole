@@ -15,6 +15,7 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/mpfss_known_indices.h"
+
 #include "NTL/ZZ_p.h"
 #include "absl/container/flat_hash_map.h"
 #include "distributed_vector_ole/gf128.h"

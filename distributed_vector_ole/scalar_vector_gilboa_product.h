@@ -28,6 +28,7 @@
 // a packing optimization.
 
 #include <vector>
+
 #include "distributed_vector_ole/internal/gilboa_internal.h"
 #include "mpc_utils/canonical_errors.h"
 #include "mpc_utils/status_macros.h"

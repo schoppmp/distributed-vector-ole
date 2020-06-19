@@ -17,6 +17,7 @@
 #include "benchmark/benchmark.h"
 #include "distributed_vector_ole/distributed_vector_ole.h"
 #include "distributed_vector_ole/gf128.h"
+#include "gperftools/profiler.h"
 #include "mpc_utils/testing/comm_channel_test_helper.hpp"
 
 namespace distributed_vector_ole {
@@ -110,113 +111,121 @@ void BM_Precompute(benchmark::State &state) {
 // Timing (native).
 BENCHMARK_TEMPLATE(BM_Precompute, uint8_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint16_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint32_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint64_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, absl::uint128, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, gf128, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Timing (ZZ_p).
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 64)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, false, 128)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Timing (zz_p).
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, false, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, false, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, false, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, false, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (native).
 BENCHMARK_TEMPLATE(BM_Precompute, uint8_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint16_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint32_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, uint64_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, absl::uint128, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, gf128, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (ZZ_p).
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 64)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::ZZ_p, true, 128)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (zz_p).
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, true, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, true, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, true, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Precompute, NTL::zz_p, true, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 template <typename T, bool measure_communication, int num_bits = 0>
 void BM_Run(benchmark::State &state) {
+  // Check if CPU profiler is enabled and stop it. We only want to profile the
+  // main loop.
+  struct ProfilerState profiler_state;
+  ProfilerGetCurrentState(&profiler_state);
+  if (profiler_state.enabled) {
+    ProfilerStop();
+  }
+
   mpc_utils::testing::CommChannelTestHelper helper(measure_communication);
   int64_t length = state.range(0);
   comm_channel *chan0 = helper.GetChannel(0);
@@ -228,30 +237,36 @@ void BM_Run(benchmark::State &state) {
   // Spawn a thread that acts as the Receiver.
   NTLContext<T> ntl_context;
   ntl_context.save();
-  std::thread thread1([chan1, length, &ntl_context, &bytes_sent1] {
-    ntl_context.restore();
-    auto vole1 = DistributedVectorOLE<T>::Create(chan1).ValueOrDie();
-    vole1->Precompute(length);
-    chan1->flush();
-    if (measure_communication) {
-      bytes_sent1 = chan1->get_num_bytes_sent();
-    }
-    bool keep_running;
-    T x(23);
-    chan1->recv(keep_running);
-    do {
-      auto output1 = vole1->RunReceiver(length, x).ValueOrDie();
-      benchmark::DoNotOptimize(output1);
-      chan1->recv(keep_running);
-    } while (keep_running);
-  });
+  std::thread thread1(
+      [chan1, length, &ntl_context, &bytes_sent1, &profiler_state] {
+        ntl_context.restore();
+        auto vole1 = DistributedVectorOLE<T>::Create(chan1).ValueOrDie();
+        vole1->Precompute(length);
+        chan1->sync();
+        if (measure_communication) {
+          bytes_sent1 = chan1->get_num_bytes_sent();
+        }
+        bool keep_running;
+        T x(23);
+        chan1->recv(keep_running);
+        do {
+          auto output1 = vole1->RunReceiver(length, x).ValueOrDie();
+          benchmark::DoNotOptimize(output1);
+          chan1->recv(keep_running);
+        } while (keep_running);
+      });
 
   // Run the client in the main thread.
   auto vole0 = DistributedVectorOLE<T>::Create(chan0).ValueOrDie();
   vole0->Precompute(length);
-  chan0->flush();
+  chan0->sync();
   if (measure_communication) {
     bytes_sent0 = chan0->get_num_bytes_sent();
+  }
+
+  // Re-enable profiling if it was enabled.
+  if (profiler_state.enabled) {
+    ProfilerStart(profiler_state.profile_name);
   }
   for (auto _ : state) {
     chan0->send(true);
@@ -277,110 +292,110 @@ void BM_Run(benchmark::State &state) {
 // Timing (native).
 BENCHMARK_TEMPLATE(BM_Run, uint8_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint16_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint32_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint64_t, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, absl::uint128, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, gf128, false)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Timing (ZZ_p).
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 64)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, false, 128)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Timing (zz_p).
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, false, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, false, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, false, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, false, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (native).
 BENCHMARK_TEMPLATE(BM_Run, uint8_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint16_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint32_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, uint64_t, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, absl::uint128, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, gf128, true)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (ZZ_p).
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 64)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::ZZ_p, true, 128)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 // Communication (zz_p).
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, true, 8)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, true, 16)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, true, 32)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 BENCHMARK_TEMPLATE(BM_Run, NTL::zz_p, true, 60)
     ->RangeMultiplier(4)
-    ->Range(1 << 12, 1 << 22);
+    ->Range(1 << 12, 1 << 24);
 
 }  // namespace
 }  // namespace distributed_vector_ole

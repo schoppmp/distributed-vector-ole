@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/cuckoo_hasher.h"
+
 #include <cmath>
+
 #include "absl/memory/memory.h"
 #include "openssl/err.h"
 

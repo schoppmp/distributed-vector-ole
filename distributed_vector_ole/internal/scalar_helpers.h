@@ -31,12 +31,6 @@
 #include "distributed_vector_ole/internal/ntl_helpers.h"
 #include "openssl/rand.h"
 
-// OpenMP custom reductions for non-integer types.
-#pragma omp declare reduction(+: NTL::ZZ_p: omp_out += omp_in) initializer (omp_priv = NTL::ZZ_p(0))
-#pragma omp declare reduction(+: NTL::zz_p: omp_out += omp_in) initializer (omp_priv = NTL::zz_p(0))
-#pragma omp declare reduction(+: absl::uint128: omp_out += omp_in) initializer (omp_priv = 0)
-#pragma omp declare reduction(+: distributed_vector_ole::gf128: omp_out += omp_in) initializer (omp_priv = distributed_vector_ole::gf128(0))
-
 namespace distributed_vector_ole {
 
 // Defines helper functions that need to be implemented by all scalar types we

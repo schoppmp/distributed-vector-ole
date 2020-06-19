@@ -1,5 +1,7 @@
 #include "distributed_vector_ole/aes_uniform_bit_generator.h"
+
 #include <stdexcept>
+
 #include "absl/strings/str_cat.h"
 #include "mpc_utils/canonical_errors.h"
 #include "mpc_utils/status_macros.h"

@@ -18,6 +18,7 @@
 #include <iostream>
 #include <typeinfo>
 #include <vector>
+
 #include "absl/strings/string_view.h"
 #include "distributed_vector_ole/distributed_vector_ole.h"
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"

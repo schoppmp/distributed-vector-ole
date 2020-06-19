@@ -15,7 +15,9 @@
 //    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "distributed_vector_ole/mpfss_known_indices.h"
+
 #include <numeric>
+
 #include "openssl/rand.h"
 
 namespace distributed_vector_ole {
