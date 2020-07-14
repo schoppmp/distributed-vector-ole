@@ -27,15 +27,16 @@ def distributed_vector_ole_preload():
     if "com_google_absl" not in native.existing_rules():
         http_archive(
             name = "com_google_absl",
-            strip_prefix = "abseil-cpp-a8b03d90e0afe03fefa16d4a871ece344a5d52ad",
-            urls = ["https://github.com/abseil/abseil-cpp/archive/a8b03d90e0afe03fefa16d4a871ece344a5d52ad.zip"],
+            strip_prefix = "abseil-cpp-55c04eb9203a93db1c0816adddf3182b45da5384",
+            urls = ["https://github.com/abseil/abseil-cpp/archive/55c04eb9203a93db1c0816adddf3182b45da5384.zip"],
+            sha256 = "e4bd991c06affc84cba15ecb5f758975491b211147ec28a51ad990c4faa36a38"
         )
     if "com_github_nelhage_rules_boost" not in native.existing_rules():
         http_archive(
             name = "com_github_nelhage_rules_boost",
-            sha256 = "ea88159d5b91a852de0cd8ccdc78c9ca42c54538241aa7ff727de3544da7f051",
-            strip_prefix = "rules_boost-fe9a0795e909f10f2bfb6bfa4a51e66641e36557",
-            url = "https://github.com/nelhage/rules_boost/archive/fe9a0795e909f10f2bfb6bfa4a51e66641e36557.zip",
+            strip_prefix = "rules_boost-ccc90b00c2fae7267cc25b77199fb992acd5e799",
+            url = "https://github.com/nelhage/rules_boost/archive/ccc90b00c2fae7267cc25b77199fb992acd5e799.zip",
+            sha256 = "68c67476f8e6257cb858a2378a4663a54690ed64562db2c3be4702c537e1edd8",
         )
     if "com_github_schoppmp_rules_oblivc" not in native.existing_rules():
         http_archive(
@@ -47,50 +48,53 @@ def distributed_vector_ole_preload():
     if "rules_foreign_cc" not in native.existing_rules():
         http_archive(
             name = "rules_foreign_cc",
-            url = "https://github.com/bazelbuild/rules_foreign_cc/archive/74b146dc87d37baa1919da1e8f7b8aafbd32acd9.zip",
-            strip_prefix = "rules_foreign_cc-74b146dc87d37baa1919da1e8f7b8aafbd32acd9",
-            sha256 = "2de65ab702ebd0094da3885aae2a6a370df5edb4c9d0186096de79dffb356dbc",
+            url = "https://github.com/bazelbuild/rules_foreign_cc/archive/9eb30f8c5a214799b73707666ca49e7b7a35978f.zip",
+            strip_prefix = "rules_foreign_cc-9eb30f8c5a214799b73707666ca49e7b7a35978f",
+            sha256 = "0d82c6e7fcf623885a47ce52c2e30321aa0b868ff3b9fedfd6670541fc5874ad",
         )
 
     # Transitive dependency of io_bazel_rules_docker
     if "bazel_skylib" not in native.existing_rules():
         http_archive(
             name = "bazel_skylib",
-            sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
-            strip_prefix = "bazel-skylib-0.8.0",
-            urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz"],
+            strip_prefix = "bazel-skylib-8f3151fb4a91d5f2ae4cad5901ea72fe30a2aba0",
+            urls = ["https://github.com/bazelbuild/bazel-skylib/archive/8f3151fb4a91d5f2ae4cad5901ea72fe30a2aba0.zip"],
+            sha256 = "34c84c459569d2618694e3c48e5fa21d326cc1333e51eed25fe8aa4be6fbbbd5",
         )
     if "bazel_gazelle" not in native.existing_rules():
         http_archive(
             name = "bazel_gazelle",
-            urls = [
-                "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/bazel-gazelle/releases/download/0.18.2/bazel-gazelle-0.18.2.tar.gz",
-                "https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.2/bazel-gazelle-0.18.2.tar.gz",
-            ],
-            sha256 = "7fc87f4170011201b1690326e8c16c5d802836e3a0d617d8f75c3af2b23180c4",
+            strip_prefix = "bazel-gazelle-6eaa2eac3d92c17e1607c280c91251774471ab8f",
+            urls = ["https://github.com/bazelbuild/bazel-gazelle/archive/6eaa2eac3d92c17e1607c280c91251774471ab8f.zip"],
+            sha256 = "1bce24b1fc3239200fbf1c158a1603bce1675c1233927cc37e76f2258e8b8d47",
         )
     if "io_bazel_rules_go" not in native.existing_rules():
         http_archive(
             name = "io_bazel_rules_go",
-            urls = [
-                "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/rules_go/releases/download/0.19.4/rules_go-0.19.4.tar.gz",
-                "https://github.com/bazelbuild/rules_go/releases/download/0.19.4/rules_go-0.19.4.tar.gz",
-            ],
-            sha256 = "ae8c36ff6e565f674c7a3692d6a9ea1096e4c1ade497272c2108a810fb39acd2",
+            strip_prefix = "rules_go-03e0fda7076cbae926fe7699c5236e57165e7a1c",
+            urls = ["https://github.com/bazelbuild/rules_go/archive/03e0fda7076cbae926fe7699c5236e57165e7a1c.zip"],
+            sha256 = "4f29f7788ec95689779d09ab51a4d8125e52747f9fa2df68c866b0a58ff0d983",
+        )
+    if "rules_python" not in native.existing_rules():
+        http_archive(
+            name = "rules_python",
+            url = "https://github.com/bazelbuild/rules_python/archive/32e964842b4139645417d0a8c24c807c163d7cfc.zip",
+            strip_prefix = "rules_python-32e964842b4139645417d0a8c24c807c163d7cfc",
+            sha256 = "6874ee36cd55a2ffacf956ca60f360e12acdbe8389de1a7a624a13916da00879",
         )
 
     # New dependencies.
     if "mpc_utils" not in native.existing_rules():
         http_archive(
             name = "mpc_utils",
-            sha256 = "d95c8814ef2e26ae5ef5baced7a68ff3fd6866e0cb681a637a0f8cb7d99690d6",
-            url = "https://github.com/schoppmp/mpc-utils/archive/54599ec42f5fd6c2b31eb93c6571a26c5949b217.zip",
-            strip_prefix = "mpc-utils-54599ec42f5fd6c2b31eb93c6571a26c5949b217",
+            url = "https://github.com/schoppmp/mpc-utils/archive/f2b8c1723db6cc149602652dd1c47bfe1e7dea21.zip",
+            strip_prefix = "mpc-utils-f2b8c1723db6cc149602652dd1c47bfe1e7dea21",
+            sha256 = "e73613d2e81a9de3471b82f821cd6d8752b5c56aa766c995ad8c00fd7d145144",
         )
     if "io_bazel_rules_docker" not in native.existing_rules():
         http_archive(
             name = "io_bazel_rules_docker",
-            sha256 = "9ff889216e28c918811b77999257d4ac001c26c1f7c7fb17a79bc28abf74182e",
-            strip_prefix = "rules_docker-0.10.1",
-            urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.10.1/rules_docker-v0.10.1.tar.gz"],
+            strip_prefix = "rules_docker-2ae5f7f0c43b7efd32a4d7f927bb701f060972af",
+            urls = ["https://github.com/bazelbuild/rules_docker/archive/2ae5f7f0c43b7efd32a4d7f927bb701f060972af.zip"],
+            sha256 = "363a8b03f7af8bdd5b44a9d4e19566870b520f8c155fb72837f7fd4a3bdc2538"
         )

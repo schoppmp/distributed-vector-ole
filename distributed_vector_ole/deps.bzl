@@ -28,6 +28,7 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
 load(
     "@io_bazel_rules_docker//cc:image.bzl",
     _cc_image_repos = "repositories",
@@ -70,6 +71,7 @@ def distributed_vector_ole_deps():
     mpc_utils_deps(enable_oblivc = False)
 
     container_repositories()
+    container_deps()
     _cc_image_repos()
 
     # Something needs a recent GlibC, which is not included in standard distroless images.
