@@ -16,7 +16,7 @@
 
 load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_bundle")
-load("@io_bazel_rules_docker//container:new_push.bzl", "new_container_push")
+load("@io_bazel_rules_docker//container:push.bzl", "container_push")
 load("//experiments:docker_deploy_tag_setting.bzl", "docker_deploy_tag_setting")
 
 DISTRIBUTED_VECTOR_OLE_DEFAULT_COPTS = [
@@ -65,7 +65,7 @@ genrule(
     toolchains = [":docker_deploy_tag"]
 )
 
-new_container_push(
+container_push(
     name = "deploy_hu",
     format = "Docker",
     registry = "gitlab.informatik.hu-berlin.de:4567",

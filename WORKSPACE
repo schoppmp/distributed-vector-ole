@@ -23,3 +23,7 @@ distributed_vector_ole_preload()
 load("//distributed_vector_ole:deps.bzl", "distributed_vector_ole_deps")
 
 distributed_vector_ole_deps()
+
+load("@io_bazel_rules_docker//repositories:pip_repositories.bzl", "pip_deps")
+
+pip_deps()
