@@ -77,7 +77,7 @@ def distributed_vector_ole_deps():
     # Something needs a recent GlibC, which is not included in standard distroless images.
     container_pull(
         name = "distroless_base",
-        digest = "sha256:6d25761ba94c2b94db2dbea59390eaca65ff39596d64ec940d74140e1dc8872a",
+        digest = "sha256:c6f196cb2cd479d2ed2986dcb8365f52ebf6f22fc05d63aa77a51fc6725d082f",
         registry = "index.docker.io",
         repository = "schoppmp/distroless-arch",
     )
