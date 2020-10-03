@@ -306,6 +306,8 @@ cc_library(
         "@boringssl//:crypto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/memory",
+        "@mpc_utils//mpc_utils/boost_serialization:eigen",
+        "@mpc_utils//third_party/eigen",
     ],
 )
 
@@ -451,6 +453,9 @@ cc_binary(
 
 cc_library(
     name = "distributed_vector_ole",
+    srcs = [
+        "distributed_vector_ole.cpp",
+    ],
     hdrs = [
         "distributed_vector_ole.h",
     ],

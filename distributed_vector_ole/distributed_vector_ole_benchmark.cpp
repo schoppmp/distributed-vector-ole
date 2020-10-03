@@ -84,17 +84,27 @@ void BM_Precompute(benchmark::State &state) {
     state.PauseTiming();
     NTLContext<T> ntl_context;
     ntl_context.save();
-    std::thread thread1([chan1, length, &ntl_context, &bytes_sent1] {
+    std::thread thread1([chan1, &ntl_context, &bytes_sent1, length] {
       ntl_context.restore();
       auto vole1 = DistributedVectorOLE<T>::Create(chan1).ValueOrDie();
       chan1->sync();
-      benchmark::DoNotOptimize(vole1->Precompute(length));
+      auto status = vole1->PrecomputeSender(length);
+      if (!status.ok()) {
+        std::cerr << status << std::endl;
+        return;
+      }
+      benchmark::DoNotOptimize(status);
     });
 
     auto vole0 = DistributedVectorOLE<T>::Create(chan0).ValueOrDie();
     chan0->sync();
     state.ResumeTiming();
-    benchmark::DoNotOptimize(vole0->Precompute(length));
+    auto status = vole0->PrecomputeReceiver(length);
+    if (!status.ok()) {
+      std::cerr << status << std::endl;
+      return;
+    }
+    benchmark::DoNotOptimize(status);
     thread1.join();
   }
 
@@ -241,16 +251,19 @@ void BM_Run(benchmark::State &state) {
       [chan1, length, &ntl_context, &bytes_sent1, &profiler_state] {
         ntl_context.restore();
         auto vole1 = DistributedVectorOLE<T>::Create(chan1).ValueOrDie();
-        vole1->Precompute(length);
+        auto status = vole1->PrecomputeReceiver(length);
+        if (!status.ok()) {
+          std::cerr << status << std::endl;
+          return;
+        }
         chan1->sync();
         if (measure_communication) {
           bytes_sent1 = chan1->get_num_bytes_sent();
         }
         bool keep_running;
-        T x(23);
         chan1->recv(keep_running);
         do {
-          auto output1 = vole1->RunReceiver(length, x).ValueOrDie();
+          auto output1 = vole1->RunReceiver(length).ValueOrDie();
           benchmark::DoNotOptimize(output1);
           chan1->recv(keep_running);
         } while (keep_running);
@@ -258,7 +271,11 @@ void BM_Run(benchmark::State &state) {
 
   // Run the client in the main thread.
   auto vole0 = DistributedVectorOLE<T>::Create(chan0).ValueOrDie();
-  vole0->Precompute(length);
+  auto status = vole0->PrecomputeSender(length);
+  if (!status.ok()) {
+    std::cerr << status << std::endl;
+    return;
+  }
   chan0->sync();
   if (measure_communication) {
     bytes_sent0 = chan0->get_num_bytes_sent();

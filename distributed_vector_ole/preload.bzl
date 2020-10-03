@@ -29,7 +29,7 @@ def distributed_vector_ole_preload():
             name = "com_google_absl",
             strip_prefix = "abseil-cpp-55c04eb9203a93db1c0816adddf3182b45da5384",
             urls = ["https://github.com/abseil/abseil-cpp/archive/55c04eb9203a93db1c0816adddf3182b45da5384.zip"],
-            sha256 = "e4bd991c06affc84cba15ecb5f758975491b211147ec28a51ad990c4faa36a38"
+            sha256 = "e4bd991c06affc84cba15ecb5f758975491b211147ec28a51ad990c4faa36a38",
         )
     if "com_github_nelhage_rules_boost" not in native.existing_rules():
         http_archive(
@@ -87,14 +87,14 @@ def distributed_vector_ole_preload():
     if "mpc_utils" not in native.existing_rules():
         http_archive(
             name = "mpc_utils",
-            url = "https://github.com/schoppmp/mpc-utils/archive/f2b8c1723db6cc149602652dd1c47bfe1e7dea21.zip",
-            strip_prefix = "mpc-utils-f2b8c1723db6cc149602652dd1c47bfe1e7dea21",
             sha256 = "e73613d2e81a9de3471b82f821cd6d8752b5c56aa766c995ad8c00fd7d145144",
+            strip_prefix = "mpc-utils-f2b8c1723db6cc149602652dd1c47bfe1e7dea21",
+            url = "https://github.com/schoppmp/mpc-utils/archive/f2b8c1723db6cc149602652dd1c47bfe1e7dea21.zip",
         )
     if "io_bazel_rules_docker" not in native.existing_rules():
         http_archive(
             name = "io_bazel_rules_docker",
             strip_prefix = "rules_docker-2ae5f7f0c43b7efd32a4d7f927bb701f060972af",
             urls = ["https://github.com/bazelbuild/rules_docker/archive/2ae5f7f0c43b7efd32a4d7f927bb701f060972af.zip"],
-            sha256 = "363a8b03f7af8bdd5b44a9d4e19566870b520f8c155fb72837f7fd4a3bdc2538"
+            sha256 = "363a8b03f7af8bdd5b44a9d4e19566870b520f8c155fb72837f7fd4a3bdc2538",
         )
