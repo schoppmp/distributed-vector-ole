@@ -22,19 +22,13 @@
 
 namespace distributed_vector_ole {
 
-MPFSSKnownIndices::MPFSSKnownIndices(
-    std::unique_ptr<CuckooHasher> hasher,
-    std::unique_ptr<SPFSSKnownIndex> spfss,
-    std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa,
-    ScalarVectorGilboaProduct* gilboa)
-    : hasher_(std::move(hasher)),
-      spfss_(std::move(spfss)),
-      owned_gilboa_(std::move(owned_gilboa)),
-      gilboa_(gilboa) {}
+MPFSSKnownIndices::MPFSSKnownIndices(std::unique_ptr<CuckooHasher> hasher,
+                                     std::unique_ptr<SPFSSKnownIndex> spfss,
+                                     mpc_utils::comm_channel* channel)
+    : hasher_(std::move(hasher)), spfss_(std::move(spfss)), channel_(channel) {}
 
 mpc_utils::StatusOr<std::unique_ptr<MPFSSKnownIndices>>
 MPFSSKnownIndices::Create(mpc_utils::comm_channel* channel,
-                          ScalarVectorGilboaProduct* gilboa,
                           double statistical_security) {
   if (!channel) {
     return mpc_utils::InvalidArgumentError("`channel` must not be NULL");
@@ -43,9 +37,9 @@ MPFSSKnownIndices::Create(mpc_utils::comm_channel* channel,
     return mpc_utils::InvalidArgumentError(
         "`statistical_security` must not be negative.");
   }
-  // Make sure we have enough bits of statistical security for SPFSS, Gilboa and
+  // Make sure we have enough bits of statistical security for SPFSS and
   // Cuckoo hashing to fail independently.
-  statistical_security += std::log2(gilboa ? 2 : 3);
+  statistical_security += 1;
 
   std::unique_ptr<SPFSSKnownIndex> spfss;
   channel->sync();
@@ -67,16 +61,8 @@ MPFSSKnownIndices::Create(mpc_utils::comm_channel* channel,
                    CuckooHasher::Create(hasher_seed, kNumHashFunctions,
                                         statistical_security));
 
-  // Allocate Gilboa instance if we didn't get one from the caller.
-  std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa = nullptr;
-  if (!gilboa) {
-    ASSIGN_OR_RETURN(owned_gilboa, ScalarVectorGilboaProduct::Create(
-                                       channel, statistical_security));
-    gilboa = owned_gilboa.get();
-  }
-
-  return absl::WrapUnique(new MPFSSKnownIndices(
-      std::move(hasher), std::move(spfss), std::move(owned_gilboa), gilboa));
+  return absl::WrapUnique(
+      new MPFSSKnownIndices(std::move(hasher), std::move(spfss), channel));
 }
 
 mpc_utils::Status MPFSSKnownIndices::UpdateBuckets(int64_t output_size,

@@ -227,13 +227,6 @@ mpc_utils::StatusOr<std::vector<int64_t>> CuckooHasher::HashCuckoo(
     }
   }
 
-  //  // Map buckets back to their corresponding key-value pairs.
-  //  std::vector<absl::optional<std::pair<K, V>>> result(num_buckets);
-  //  for (int64_t i = 0; i < num_buckets; i++) {
-  //    if (buckets[i] != -1) {
-  //      result[i] = std::make_pair(keys[buckets[i]], values[buckets[i]]);
-  //    }
-  //  }
   return buckets;
 }
 

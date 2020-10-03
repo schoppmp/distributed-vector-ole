@@ -85,7 +85,6 @@ mpc_utils::Status RunVOLE(int size, mpc_utils::comm_channel *channel,
   ASSIGN_OR_RETURN(
       auto ole,
       distributed_vector_ole::DistributedVectorOLE<T>::Create(channel));
-  RETURN_IF_ERROR(ole->Precompute(size));
   channel->sync();
   int64_t precomputation_bytes_sent = 0, precomputation_bytes_received = 0;
   if (channel->is_measured()) {
@@ -312,7 +311,7 @@ int main(int argc, const char *argv[]) {
            VoleVsGilboaExperiment(&p, true, 1),
            VoleVsGilboaExperiment(&p, false, 10),
            VoleParallelismExperiment(&p, 10),
-           SPFSSExperiment(&p, 10),
+//           SPFSSExperiment(&p, 10),
        }) {
     if (!status.ok()) {
       std::cerr << status.message() << "\n";

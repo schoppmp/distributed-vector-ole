@@ -43,19 +43,37 @@ class DistributedVectorOLETest : public ::testing::Test {
     thread1.join();
   }
 
-  void TestVector(int size) {
-    Vector<T> u, v, w;
-    T x(2);
+  void Precompute(int size) {
+    T delta(23);
     NTLContext<T> ntl_context;
     ntl_context.save();
-    std::thread thread1([this, size, &ntl_context, &u, &v] {
+    std::thread thread1([this, size, &ntl_context] {
       ntl_context.restore();
-      ASSERT_OK_AND_ASSIGN(std::tie(u, v), vole_0_->RunSender(size));
+      ASSERT_TRUE(vole_0_->PrecomputeSender(size).ok());
     });
-    ASSERT_OK_AND_ASSIGN(w, vole_1_->RunReceiver(size, x));
+    ASSERT_TRUE(vole_1_->PrecomputeReceiver(size, delta).ok());
     thread1.join();
-    Vector<T> w2 = u * x + v;
-    EXPECT_EQ(w, w2);
+  }
+
+  void TestVector(int size) {
+    typename DistributedVectorOLE<T>::SenderResult sender_result;
+    typename DistributedVectorOLE<T>::ReceiverResult receiver_result;
+    NTLContext<T> ntl_context;
+    ntl_context.save();
+    std::thread thread1([this, size, &ntl_context, &sender_result] {
+      ntl_context.restore();
+      ASSERT_OK_AND_ASSIGN(sender_result, vole_0_->RunSender(size));
+    });
+    ASSERT_OK_AND_ASSIGN(receiver_result, vole_1_->RunReceiver(size));
+    thread1.join();
+    Vector<T> w2 = sender_result.u * receiver_result.delta + sender_result.v;
+    EXPECT_EQ(receiver_result.w, w2);
+    for (int i = 0; i < receiver_result.w.size(); i++) {
+      if (receiver_result.w[i] != w2[i]) {
+        std::cout << "mismatch: " << i << " " << receiver_result.w[i] << " "
+                  << w2[i] << std::endl;
+      }
+    }
   }
 
   mpc_utils::testing::CommChannelTestHelper helper_;
@@ -64,40 +82,35 @@ class DistributedVectorOLETest : public ::testing::Test {
 };
 
 using MyTypes = ::testing::Types<uint8_t, uint16_t, uint32_t, uint64_t,
-                                 absl::uint128, gf128, NTL::ZZ_p>;
+                                 absl::uint128, gf128, NTL::zz_p>;
 TYPED_TEST_SUITE(DistributedVectorOLETest, MyTypes);
 
 TYPED_TEST(DistributedVectorOLETest, TestSmallVectors) {
-  for (int size = 1; size < 20; size += 4) {
-    if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
-      for (const auto &modulus : {
-               "340282366920938463463374607431768211456",  // 2^128 (the largest
-                                                           // modulus we
-                                                           // support)
-               // Prime moduli:
-               "340282366920938463463374607431768211297",  // 2^128 - 159
-               "18446744073709551557",                     // 2^64 - 59
-               "4294967291",                               // 2^32 - 5
-               "65521",                                    // 2^16 - 15
-               "251"                                       // 2^8 - 5
-           }) {
-        NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
-        this->TestVector(size);
-      }
-    } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
-      for (int64_t modulus : {
-               1125899906842597L,  // 2^50 - 27
-               4294967291L,        // 2^32 - 5
-               65521L,             // 2^16 - 15
-               251L                // 2^8 - 5
-           }) {
-        NTL::zz_p::init(modulus);
-        this->TestVector(size);
-      }
-    } else {
-      this->TestVector(size);
-    }
+  // Set up NTL.
+  int64_t modulus = 1152921504606846883L;  // 2^60 - 93
+  if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
+  } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
+    NTL::zz_p::init(modulus);
   }
+
+  auto sizes = {1, 2, 123};
+  this->Precompute(50);
+  for (int size : sizes) {
+    this->TestVector(size);
+  }
+}
+
+TYPED_TEST(DistributedVectorOLETest, TestLargeVector) {  // Set up NTL.
+  int64_t modulus = 1152921504606846883L;                // 2^60 - 93
+  if (std::is_same<TypeParam, NTL::ZZ_p>::value) {
+    NTL::ZZ_p::init(NTL::conv<NTL::ZZ>(modulus));
+  } else if (std::is_same<TypeParam, NTL::zz_p>::value) {
+    NTL::zz_p::init(modulus);
+  }
+
+  int size = 500000;
+  this->TestVector(size);
 }
 
 }  // namespace

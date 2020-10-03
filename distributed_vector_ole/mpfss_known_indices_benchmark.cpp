@@ -49,36 +49,46 @@ static void BM_RunNative(benchmark::State &state) {
   comm_channel *chan0 = helper.GetChannel(0);
   comm_channel *chan1 = helper.GetChannel(1);
   emp::initialize_relic();
+  auto mpfss0 = MPFSSKnownIndices::Create(chan0).ValueOrDie();
+
+  // Compute number of indices and VOLE correlation.
+  int y_len = GetNumIndicesForLength(length);
+  T x(23);
+  int num_buckets = mpfss0->NumBuckets(y_len).ValueOrDie();
+  Vector<T> u(num_buckets), v(num_buckets), w(num_buckets);
+  ScalarHelper<T>::Randomize(absl::MakeSpan(u));
+  ScalarHelper<T>::Randomize(absl::MakeSpan(v));
+  w = u * x + v;
 
   // Spawn a thread that acts as the server.
   NTLContext<T> ntl_context;
   ntl_context.save();
-  std::thread thread1([chan1, length, &ntl_context] {
+  std::thread thread1([chan1, length, &ntl_context, y_len, &w, &x] {
     ntl_context.restore();
     auto mpfss1 = MPFSSKnownIndices::Create(chan1).ValueOrDie();
     bool keep_running;
     std::vector<T> output1(length);
-    T x(23);
-    int y_len = GetNumIndicesForLength(length);
     do {
-      mpfss1->RunValueProviderVectorOLE(x, y_len, absl::MakeSpan(output1));
+      mpfss1->RunValueProviderVectorOLE<T>(x, y_len, w,
+                                           absl::MakeSpan(output1));
       benchmark::DoNotOptimize(output1);
       chan1->recv(keep_running);
     } while (keep_running);
   });
 
   // Run the client in the main thread.
-  auto mpfss0 = MPFSSKnownIndices::Create(chan0).ValueOrDie();
   std::vector<T> output0(length);
-  std::vector<T> y(GetNumIndicesForLength(length));
+  std::vector<T> y(y_len);
   std::fill(y.begin(), y.end(), T(42));
-  std::vector<int64_t> indices(GetNumIndicesForLength(length));
+  std::vector<int64_t> indices(y_len);
   std::iota(indices.begin(), indices.end(), 0);
-  mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
+  mpfss0->RunIndexProviderVectorOLE<T>(y, indices, u, v,
+                                       absl::MakeSpan(output0));
   for (auto _ : state) {
     chan0->send(true);
     chan0->flush();
-    mpfss0->RunIndexProviderVectorOLE<T>(y, indices, absl::MakeSpan(output0));
+    mpfss0->RunIndexProviderVectorOLE<T>(y, indices, u, v,
+                                         absl::MakeSpan(output0));
     benchmark::DoNotOptimize(output0);
   }
   chan0->send(false);

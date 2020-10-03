@@ -33,14 +33,19 @@
 
 #include <algorithm>
 
+#include "Eigen/Dense"
 #include "NTL/ZZ_p.h"
 #include "absl/container/flat_hash_set.h"
 #include "distributed_vector_ole/cuckoo_hasher.h"
 #include "distributed_vector_ole/scalar_vector_gilboa_product.h"
 #include "distributed_vector_ole/spfss_known_index.h"
+#include "mpc_utils/boost_serialization/eigen.hpp"
 #include "openssl/rand.h"
 
 namespace distributed_vector_ole {
+
+template <typename T>
+using Vector = Eigen::Matrix<T, 1, Eigen::Dynamic>;
 
 class MPFSSKnownIndices {
  public:
@@ -50,14 +55,18 @@ class MPFSSKnownIndices {
   // created with the given statistical security parameter and managed by this
   // class.
   static mpc_utils::StatusOr<std::unique_ptr<MPFSSKnownIndices>> Create(
-      mpc_utils::comm_channel* channel,
-      ScalarVectorGilboaProduct* gilboa = nullptr,
-      double statistical_security = 40);
+      mpc_utils::comm_channel *channel, double statistical_security = 40);
 
   // Does nothing if cached_output_size_ == output_size. Otherwise hashes the
   // interval [0, output_size) using hasher_, and saves the result in buckets_.
   // Saves computation time if called before Run*.
   mpc_utils::Status UpdateBuckets(int64_t output_size, int num_indices);
+
+  // Returns the number of buckets used for cuckoo hashing the given number of
+  // indices.
+  mpc_utils::StatusOr<int> NumBuckets(int num_indices) {
+    return hasher_->GetOptimalNumberOfBuckets(num_indices);
+  }
 
   // Runs the ValueProvider side of the protocol. `output` must point to an
   // array of pre-allocated Ts.
@@ -81,23 +90,28 @@ class MPFSSKnownIndices {
 
   // Runs the ValueProvider side of the Vector-OLE optimized protocol. That is,
   // instead of being additively shared, `z` is set to `x y`, where `x` is owned
-  // by the server and `y` is a vector of size `y_len` owned by the client.
+  // by the server and `y` is a vector of size `y_len` owned by the client. This
+  // variant uses a pre-computed VOLE correlation `w = ux + v` to compute
+  // additive shares of `x y`. `w` must have size equal to NumBuckets(y_len).
   template <typename T>
   mpc_utils::Status RunValueProviderVectorOLE(T x, int y_len,
+                                              absl::Span<const T> w,
                                               absl::Span<T> output);
 
   // Runs the IndexProvider side of the Vector-OLE optimized protocol. See
-  // RunValueProviderVectorOLE for a description.
+  // RunValueProviderVectorOLE for a description. `u` and `v` must have sizes
+  // equal to NumBuckets(y_len).
   template <typename T>
   mpc_utils::Status RunIndexProviderVectorOLE(absl::Span<const T> y,
                                               absl::Span<const int64_t> indices,
+                                              absl::Span<const T> u,
+                                              absl::Span<const T> v,
                                               absl::Span<T> output);
 
  private:
   MPFSSKnownIndices(std::unique_ptr<CuckooHasher> hasher,
                     std::unique_ptr<SPFSSKnownIndex> spfss,
-                    std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa,
-                    ScalarVectorGilboaProduct* gilboa);
+                    mpc_utils::comm_channel *channel);
 
   // Number of hash functions for cuckoo hashing.
   static const int kNumHashFunctions = 3;
@@ -119,27 +133,28 @@ class MPFSSKnownIndices {
   // Single-point FSS instance.
   std::unique_ptr<SPFSSKnownIndex> spfss_;
 
-  // Gilboa multiplication instance. If `gilboa` was not passed at construction,
-  // `gilboa_` it is equal to `owned_gilboa_.get()`.
-  std::unique_ptr<ScalarVectorGilboaProduct> owned_gilboa_;
-  ScalarVectorGilboaProduct* gilboa_;
+  // Channel for sending masked value share.
+  mpc_utils::comm_channel *channel_;
 };
 
 template <typename T>
 mpc_utils::Status MPFSSKnownIndices::RunValueProviderVectorOLE(
-    T x, int y_len, absl::Span<T> output) {
+    T x, int y_len, absl::Span<const T> w, absl::Span<T> output) {
   if (y_len < 1) {
     return mpc_utils::InvalidArgumentError("`y_len` must be positive");
   }
   RETURN_IF_ERROR(UpdateBuckets(output.size(), y_len));
   int num_buckets = buckets_.size();
-  ASSIGN_OR_RETURN(std::vector<T> val_share,
-                   gilboa_->RunValueProvider(x, num_buckets));
+
+  // Receive masked and permuted y from other party and compute our share of xy
+  // as (u+y)x-w.
+  Vector<T> y_masked;
+  channel_->recv(y_masked);
+  Vector<T> val_share =
+      y_masked * x - Eigen::Map<const Vector<T>>(w.data(), w.size());
 
   // Zero out `output`.
-  for (auto& val : output) {
-    val = T(0);
-  }
+  std::fill(output.begin(), output.end(), T(0));
 
   std::vector<std::vector<T>> bucket_outputs(num_buckets);
   std::vector<absl::Span<T>> bucket_output_spans(num_buckets);
@@ -149,7 +164,7 @@ mpc_utils::Status MPFSSKnownIndices::RunValueProviderVectorOLE(
   }
   // Compute FSS for each bucket, and map the results  back to `output`.
   RETURN_IF_ERROR(spfss_->RunValueProviderBatched<T>(
-      absl::MakeConstSpan(val_share), absl::MakeSpan(bucket_output_spans)));
+      val_share, absl::MakeSpan(bucket_output_spans)));
   for (int i = 0; i < num_buckets; i++) {
     for (int j = 0; j < static_cast<int>(buckets_[i].size()); j++) {
       output[buckets_[i][j]] += bucket_outputs[i][j];
@@ -161,7 +176,7 @@ mpc_utils::Status MPFSSKnownIndices::RunValueProviderVectorOLE(
 template <typename T>
 mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
     absl::Span<const T> y, absl::Span<const int64_t> indices,
-    absl::Span<T> output) {
+    absl::Span<const T> u, absl::Span<const T> v, absl::Span<T> output) {
   if (y.size() != indices.size()) {
     return mpc_utils::InvalidArgumentError(
         "`y` and `indices` must have the same size");
@@ -199,14 +214,18 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
   // y padded with zeros and permuted according to hashed_inputs:
   // y_permuted[i] = y[j] if hashed_inputs[i] == j, and 0 if hashed_inputs[i] ==
   // -1.
-  std::vector<T> y_permuted(num_buckets, T(0));
+  Vector<T> y_permuted(num_buckets);
+  std::fill(y_permuted.begin(), y_permuted.end(), T(0));
   for (int i = 0; i < num_buckets; i++) {
     if (hashed_inputs[i] != -1) {
       y_permuted[i] = y[hashed_inputs[i]];
     }
   }
-  ASSIGN_OR_RETURN(std::vector<T> val_share,
-                   gilboa_->RunVectorProvider<T>(y_permuted));
+
+  // Mask y_permuted with u and send it over. Our share of xy is v.
+  y_permuted += Eigen::Map<const Vector<T>>(u.data(), u.size());
+  channel_->send(y_permuted);
+  channel_->flush();
 
   // Zero out `output`.
   std::fill(output.begin(), output.end(), T(0));
@@ -238,9 +257,9 @@ mpc_utils::Status MPFSSKnownIndices::RunIndexProviderVectorOLE(
       }
     }
   }
-  RETURN_IF_ERROR(spfss_->RunIndexProviderBatched(
-      absl::MakeConstSpan(val_share), absl::MakeConstSpan(index_in_bucket),
-      absl::MakeSpan(bucket_output_spans)));
+  RETURN_IF_ERROR(
+      spfss_->RunIndexProviderBatched(v, absl::MakeConstSpan(index_in_bucket),
+                                      absl::MakeSpan(bucket_output_spans)));
   for (int i = 0; i < num_buckets; i++) {
     for (int j = 0; j < static_cast<int>(buckets_[i].size()); j++) {
       output[buckets_[i][j]] += bucket_outputs[i][j];

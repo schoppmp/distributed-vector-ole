@@ -82,18 +82,26 @@ class MPFSSKnownIndicesTest : public ::testing::Test {
     std::iota(indices.begin(), indices.end(), 0);
     std::vector<T> output_0(size), output_1(size);
 
+    // Generate VOLE correlation to use.
+    ASSERT_OK_AND_ASSIGN(int num_buckets,
+                         mpfss_known_indices_0_->NumBuckets(num_indices));
+    Vector<T> u(num_buckets), v(num_buckets), w(num_buckets);
+    ScalarHelper<T>::Randomize(absl::MakeSpan(u));
+    ScalarHelper<T>::Randomize(absl::MakeSpan(v));
+    w = u * x + v;
+
     // Run protocol.
     NTLContext<T> ntl_context;
     ntl_context.save();
-    std::thread thread1([this, &output_1, &y, &indices, &ntl_context] {
+    std::thread thread1([this, &output_1, &y, &indices, &u, &v, &ntl_context] {
       ntl_context.restore();
       ASSERT_TRUE(mpfss_known_indices_1_
-                      ->RunIndexProviderVectorOLE<T>(y, indices,
+                      ->RunIndexProviderVectorOLE<T>(y, indices, u, v,
                                                      absl::MakeSpan(output_1))
                       .ok());
     });
     EXPECT_TRUE(mpfss_known_indices_0_
-                    ->RunValueProviderVectorOLE<T>(x, y.size(),
+                    ->RunValueProviderVectorOLE<T>(x, y.size(), w,
                                                    absl::MakeSpan(output_0))
                     .ok());
     thread1.join();
@@ -141,17 +149,17 @@ TYPED_TEST(MPFSSKnownIndicesTest, TestDifferentLenghts) {
   std::vector<TypeParam> output(2);
   auto status = this->mpfss_known_indices_0_
                     ->template RunIndexProviderVectorOLE<TypeParam>(
-                        {TypeParam(0)}, {0, 1}, absl::MakeSpan(output));
+                        {TypeParam(0)}, {0, 1}, {}, {}, absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`y` and `indices` must have the same size");
 }
 
 TYPED_TEST(MPFSSKnownIndicesTest, TestIndicesLongerThanOutput) {
   std::vector<TypeParam> output(1);
-  auto status =
-      this->mpfss_known_indices_0_
-          ->template RunIndexProviderVectorOLE<TypeParam>(
-              {TypeParam(0), TypeParam(1)}, {0, 1}, absl::MakeSpan(output));
+  auto status = this->mpfss_known_indices_0_
+                    ->template RunIndexProviderVectorOLE<TypeParam>(
+                        {TypeParam(0), TypeParam(1)}, {0, 1}, {}, {},
+                        absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`output` must be at least as long as `indices`");
 }
@@ -160,25 +168,26 @@ TYPED_TEST(MPFSSKnownIndicesTest, TestYEmpty) {
   std::vector<TypeParam> output(1);
   auto status = this->mpfss_known_indices_0_
                     ->template RunIndexProviderVectorOLE<TypeParam>(
-                        {}, {}, absl::MakeSpan(output));
+                        {}, {}, {}, {}, absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`y` and `indices` must not be empty");
 }
 
 TYPED_TEST(MPFSSKnownIndicesTest, TestRepeatingIndices) {
   std::vector<TypeParam> output(2);
-  auto status =
-      this->mpfss_known_indices_0_
-          ->template RunIndexProviderVectorOLE<TypeParam>(
-              {TypeParam(0), TypeParam(1)}, {0, 0}, absl::MakeSpan(output));
+  auto status = this->mpfss_known_indices_0_
+                    ->template RunIndexProviderVectorOLE<TypeParam>(
+                        {TypeParam(0), TypeParam(1)}, {0, 0}, {}, {},
+                        absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "All `indices` must be unique");
 }
 
 TYPED_TEST(MPFSSKnownIndicesTest, TestYLenNegative) {
   std::vector<TypeParam> output(1);
-  auto status = this->mpfss_known_indices_0_->RunValueProviderVectorOLE(
-      TypeParam(0), -1, absl::MakeSpan(output));
+  auto status = this->mpfss_known_indices_0_
+                    ->template RunValueProviderVectorOLE<TypeParam>(
+                        TypeParam(0), -1, {}, absl::MakeSpan(output));
   ASSERT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "`y_len` must be positive");
 }
